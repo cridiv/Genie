@@ -17,6 +17,9 @@ dependencies = [
     "curl_cffi>=0.7",
     "ddgs>=6.0",
     "pypdfium2>=5.0",
+    "pydantic>=2.6",
+    "google-genai>=1.0",
+    "Pillow>=10.0",
 ]
 
 [project.optional-dependencies]
@@ -25,7 +28,7 @@ dev = ["pytest>=8.0", "ruff>=0.6"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["scraper*", "registry*", "discovery*"]
+include = ["scraper*", "registry*", "discovery*", "intelligence*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -172,3 +172,35 @@ Web search returns messy, duplicate, and sometimes dangerous links. `trust.py` h
    - **Tier 3 (`general_web`):** News sites, health blogs, and unverified stores. Helpful for catching recall news or leads, but never trusted on its own without corroboration.
 
 When selecting the top ~8 URLs to scrape, Genie ranks **Tier 1 > Tier 2 > Tier 3**, adds a bonus if multiple search angles found the same URL, caps **max 2 URLs per domain**, and guarantees representation across search angles so one noisy domain can't crowd out other evidence.
+
+---
+
+## Step 3: Dossier Synthesis & Visual Verification (`intelligence/`)
+
+### 1. Pure-Pillow `dHash` instead of heavy image-hashing packages
+To deduplicate near-identical packaging photos across pharmacies (e.g., the same photo resized from `800×800` to `500×500` or recompressed as `.webp`), we compute a **64-bit difference hash (`dHash`)** directly in pure `Pillow` (`intelligence/images.py`):
+- Shrinks the image to a `9×8` grayscale grid and checks whether each pixel is brighter than the pixel to its right, producing a compact 16-character hex fingerprint.
+- **Why we avoided `imagehash`/`numpy`/`scipy`:** Installing those just for a 64-bit hash adds ~150 MB of heavy math libraries. Pure Pillow runs in `< 1 ms` with zero extra dependencies.
+
+---
+
+### 2. Two-Stage Image Verification Funnel
+1. **SSRF-safe download + deterministic pre-filter (`intelligence/images.py`):**
+   - Validates every URL against private/internal IP blocks (`scraper.extract.egress._resolve`, including redirect hops), caps download size (`5 MB`), verifies valid image bytes with `Pillow`, drops tiny thumbnails (`< 250px`) and wide banner shapes (`aspect ratio > 3.5`), and deduplicates via exact `SHA-256` and `dHash` Hamming distance (`<= 6`).
+2. **Single-call Multimodal Gemini Verification (`intelligence/synthesizer.py`):**
+   - Sends the remaining top candidates (up to 6 unique images) in **one multimodal Gemini request** alongside the target drug metadata.
+   - Gemini returns strict JSON (`BatchImageVerificationResponse`) classifying `is_product_packaging`, `matches_target_product` (catches wrong strength/brand boxes), `view_type` (`front_box`, `back_box`, `blister_pack`, `bottle`, `leaflet`), `visible_cues`, `visible_text_snippets`, and `quality_ok`.
+
+---
+
+### 3. Local Disk Image Storage behind a Swappable Interface (`intelligence/storage.py`)
+- Verified images are saved under `data/images/<product_key>/<sha256[:16]><ext>` via `LocalImageStorage`.
+- It implements a minimal `ImageStorage` protocol (`save`, `exists`, `read`), so swapping local disk for S3 / Cloudflare R2 / Supabase Storage later takes one adapter class without touching the pipeline.
+- Still **no Genie-side image vectors**: Genie stores curated, angle-tagged reference binaries and hands them to the CV service when needed.
+
+---
+
+### 4. Structured Gemini Dossier Extraction with Mandatory Provenance (`intelligence/llm.py`, `schemas.py`)
+- Wired to **Gemini (`google-genai`, defaulting to `gemini-2.5-flash`)** behind a minimal `LLMProvider` protocol so OpenAI or Anthropic can be swapped cleanly.
+- Uses strict Pydantic `response_schema` (`ExtractedDossierResponse`) so every extracted drug/packaging field comes with an `EvidenceClaim` (`{field_name, value, source_url, verbatim_quote}`).
+- This creates the exact contract **Step 4** needs to deterministically verify every quote and number against the original scraped pages before any dossier leaves `staging`.

@@ -25,7 +25,7 @@ dev = ["pytest>=8.0", "ruff>=0.6"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["scraper*"]
+include = ["scraper*", "registry*", "discovery*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

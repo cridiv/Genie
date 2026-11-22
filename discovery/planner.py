@@ -1,0 +1,113 @@
+"""Seed enrichment from local Greenbook and multi-angle query expansion."""
+from __future__ import annotations
+
+import re
+from typing import Dict, List, Optional
+
+from .models import DiscoverySeed, SearchQuery
+
+_CORP_SUFFIX_RE = re.compile(
+    r"\b(?:limited|ltd|plc|inc|corp|nigeria|company|pharmaceuticals?|pharma)\b",
+    re.IGNORECASE,
+)
+
+
+def enrich_seed_from_greenbook(seed: DiscoverySeed, matches: List[Dict]) -> DiscoverySeed:
+    """Fill missing seed fields from the top local Greenbook match without overwriting inputs."""
+    if not matches:
+        return seed
+    top = matches[0]
+
+    product_name = seed.product_name
+    if not product_name:
+        name = str(top.get("product_name") or "").strip()
+        strength = str(top.get("strength") or "").strip()
+        if name and strength and strength.lower() not in name.lower():
+            product_name = f"{name} {strength}"
+        elif name:
+            product_name = name
+
+    manufacturer = seed.manufacturer or (str(top.get("applicant_name") or "").strip() or None)
+    nafdac_number = seed.nafdac_number or (str(top.get("nafdac_number") or "").strip() or None)
+
+    return DiscoverySeed(
+        product_name=product_name,
+        manufacturer=manufacturer,
+        nafdac_number=nafdac_number,
+        gtin=seed.gtin,
+        country=seed.country,
+    )
+
+
+def _short_manufacturer(manufacturer: Optional[str]) -> str:
+    if not manufacturer:
+        return ""
+    stripped = _CORP_SUFFIX_RE.sub("", manufacturer)
+    cleaned = " ".join(stripped.split())
+    return cleaned or " ".join(manufacturer.split())
+
+
+def build_queries(seed: DiscoverySeed) -> List[SearchQuery]:
+    """Build targeted multi-angle search queries from an enriched DiscoverySeed."""
+    name = (seed.product_name or "").strip()
+    nafdac = (seed.nafdac_number or "").strip()
+    gtin = (seed.gtin or "").strip()
+    subject = name or nafdac or gtin
+    mfr = _short_manufacturer(seed.manufacturer)
+
+    queries: List[SearchQuery] = []
+
+    # 1. Regulatory alerts & recalls on NAFDAC
+    if name:
+        queries.append(
+            SearchQuery(
+                angle="regulatory_alerts",
+                query=f'"{name}" NAFDAC recall OR alert OR counterfeit',
+                include_domains=["nafdac.gov.ng"],
+            )
+        )
+    elif nafdac:
+        queries.append(
+            SearchQuery(
+                angle="regulatory_alerts",
+                query=f'"{nafdac}" NAFDAC',
+                include_domains=["nafdac.gov.ng"],
+            )
+        )
+
+    # 2. Official manufacturer page / SmPC / leaflet
+    if mfr:
+        mfr_query = f'"{subject}" {mfr} official leaflet OR SmPC OR packaging'
+    else:
+        mfr_query = f'"{subject}" official manufacturer leaflet OR SmPC OR packaging'
+    queries.append(SearchQuery(angle="manufacturer", query=mfr_query))
+
+    # 3. Vetted pharma reference & Nigerian pharmacies
+    queries.append(
+        SearchQuery(
+            angle="pharma_reference",
+            query=f'"{subject}" Nigeria pharmacy OR "active ingredient" OR pack',
+        )
+    )
+
+    # 4. Packaging updates / counterfeit alerts across the broader web
+    queries.append(
+        SearchQuery(
+            angle="packaging_alerts",
+            query=f'"{subject}" "new pack" OR packaging OR counterfeit OR fake Nigeria',
+        )
+    )
+
+    # 5. Exact identifier lookup when NAFDAC number or GTIN is known
+    if gtin and nafdac:
+        id_query = f'"{nafdac}" OR "{gtin}" Nigeria'
+    elif nafdac:
+        id_query = f'"{nafdac}" NAFDAC'
+    elif gtin:
+        id_query = f'"{gtin}"'
+    else:
+        id_query = ""
+    if id_query:
+        queries.append(SearchQuery(angle="identifier_exact", query=id_query))
+
+    return queries

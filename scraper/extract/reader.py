@@ -493,6 +493,23 @@ def reader_document(html: str, url: str = "", fmt: str = "markdown") -> Dict:
     except Exception:  # noqa: BLE001 - Beiwerk
         structured = {"json_ld": [], "meta": {}}
     try:
+        from .structured import extract_identifiers, extract_images, product_from_items  # noqa: PLC0415
+
+        product = product_from_items(structured["json_ld"])
+    except Exception:  # noqa: BLE001 - Beiwerk
+        product = None
+        extract_identifiers = None
+        extract_images = None
+    # Extract candidate images BEFORE _reader_metadata (htmldate may mutate tree).
+    try:
+        images = (
+            extract_images(tree, url=url, product=product, meta=structured["meta"])
+            if extract_images is not None
+            else []
+        )
+    except Exception:  # noqa: BLE001 - Beiwerk
+        images = []
+    try:
         title = reader_title(tree, None)
     except Exception:  # noqa: BLE001
         title = None
@@ -504,14 +521,20 @@ def reader_document(html: str, url: str = "", fmt: str = "markdown") -> Dict:
     doc["stage"] = "static"  # which rung of the ladder produced the page
     if structured["json_ld"] or structured["meta"]:  # leere Seiten bleiben so klein wie vorher
         doc["structured"] = structured
-    try:
-        from .structured import product_from_items  # noqa: PLC0415
-
-        product = product_from_items(structured["json_ld"])  # aus dem schon geparsten JSON-LD
-    except Exception:  # noqa: BLE001 - Beiwerk
-        product = None
     if product:
         doc["product"] = product
+    if images:
+        doc["images"] = images
+    try:
+        identifiers = (
+            extract_identifiers(content or "", product=product)
+            if extract_identifiers is not None
+            else {"nafdac_numbers": [], "gtins": []}
+        )
+    except Exception:  # noqa: BLE001 - Beiwerk
+        identifiers = {"nafdac_numbers": [], "gtins": []}
+    if identifiers["nafdac_numbers"] or identifiers["gtins"]:
+        doc["identifiers"] = identifiers
     if title:
         doc["title"] = title
     return doc

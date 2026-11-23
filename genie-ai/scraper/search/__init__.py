@@ -13,12 +13,13 @@ Pick the primary with ``SEARCH_BACKEND`` and an optional fallback with
 """
 from __future__ import annotations
 
+import os
 from typing import Dict, List, Optional
 
 from ..config import get_settings
 from ..reasons import REASONS, code_for, leading_code
 from ._common import SearchBackendError
-from .cloud import serper_search, tavily_search
+from .cloud import serper_images, serper_search, tavily_search
 from .duckduckgo import ddgs_images, ddgs_search
 from .searxng import searxng_search
 
@@ -32,12 +33,20 @@ BACKENDS = {
 
 def _chain() -> List[str]:
     s = get_settings()
+    explicit_primary = os.environ.get("SEARCH_BACKEND", "").strip().lower()
+    if not explicit_primary and s.serper_api_key:
+        chain = ["serper", "duckduckgo"]
+        if s.searxng_url:
+            chain.insert(1, "searxng")
+        return chain
     chain = [s.search_backend]
     fb = s.search_fallback
     # The fallback only joins when it is usable; a pinned primary keeps its own error.
     configured = {"searxng": bool(s.searxng_url), "serper": bool(s.serper_api_key)}
     if fb and fb != s.search_backend and configured.get(fb, True):
         chain.append(fb)
+    if s.serper_api_key and "serper" not in chain:
+        chain.append("serper")
     return [b for b in chain if b in BACKENDS]
 
 
@@ -115,10 +124,17 @@ def search_images(
     language: Optional[str] = None,
     country: Optional[str] = None,
 ) -> List[Dict]:
-    """Search for product packaging images via DuckDuckGo (`ddgs`)."""
+    """Search for product packaging images (Serper Google Images when configured, else DuckDuckGo)."""
+    if get_settings().serper_api_key:
+        try:
+            hits = serper_images(query, max_results=max_results, language=language, country=country)
+            if hits:
+                return hits
+        except SearchBackendError:
+            pass
     return ddgs_images(query, max_results=max_results, language=language, country=country)
 
 
 __all__ = ["search", "search_report", "search_images", "error_code", "searxng_search", "ddgs_search",
-           "ddgs_images", "serper_search", "tavily_search", "SearchBackendError", "BACKENDS"]
+           "ddgs_images", "serper_search", "serper_images", "tavily_search", "SearchBackendError", "BACKENDS"]
 # Stand: 24.10.2026

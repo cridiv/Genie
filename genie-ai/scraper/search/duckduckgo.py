@@ -15,8 +15,9 @@ from .regions import ddg_region
 # At most one more try per search, after a pause: for a general DDGSException, or
 # for an empty answer, which DuckDuckGo often gives during a hiccup (more so with a
 # region). Measured: a second try found 6 of 7 regional questions that came back empty.
-RETRY_AFTER_ERROR_S = 1.0
-RETRY_AFTER_EMPTY_S = 1.5
+RETRY_AFTER_ERROR_S = 2.0
+RETRY_AFTER_EMPTY_S = 2.0
+DDGS_TIMEOUT_S = 20
 _sleep = time.sleep  # tests replace it
 
 
@@ -63,7 +64,7 @@ def ddgs_search(
     query = site_scoped(query, include_domains)
     raw: list = []
     for attempt in (1, 2):
-        client = DDGS()
+        client = DDGS(timeout=DDGS_TIMEOUT_S)
         run = client.news if topic == "news" else client.text
         try:
             raw = list(run(query, region=region, safesearch="moderate",
@@ -71,7 +72,7 @@ def ddgs_search(
         except Exception as exc:  # ddgs raises its own exception types
             if not _is_no_results(exc):
                 code = _error_code(exc)
-                if code == "error" and attempt == 1:  # often a passing hiccup of one engine
+                if code in ("error", "timeout") and attempt == 1:
                     _sleep(RETRY_AFTER_ERROR_S)
                     continue
                 raise SearchBackendError(f"{code}: ddgs {type(exc).__name__}") from exc
@@ -108,7 +109,7 @@ def ddgs_images(
     region = ddg_region(language, country)
     raw: list = []
     for attempt in (1, 2):
-        client = DDGS()
+        client = DDGS(timeout=DDGS_TIMEOUT_S)
         try:
             raw = list(
                 client.images(
@@ -122,7 +123,7 @@ def ddgs_images(
         except Exception as exc:
             if not _is_no_results(exc):
                 code = _error_code(exc)
-                if code == "error" and attempt == 1:
+                if code in ("error", "timeout") and attempt == 1:
                     _sleep(RETRY_AFTER_ERROR_S)
                     continue
                 raise SearchBackendError(f"{code}: ddgs {type(exc).__name__}") from exc

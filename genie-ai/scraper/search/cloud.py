@@ -73,6 +73,68 @@ def serper_search(
     return dedupe_and_filter(hits, exclude_domains or [], max_results, include_domains)
 
 
+def serper_images(
+    query: str,
+    max_results: int = 10,
+    *,
+    language: Optional[str] = None,
+    country: Optional[str] = None,
+) -> List[Dict]:
+    """Google Images results via Serper (SERPER_API_KEY from the environment)."""
+    settings = get_settings()
+    if not settings.serper_api_key:
+        raise SearchBackendError("SERPER_API_KEY is not set (set it only via the environment).")
+
+    body: Dict[str, object] = {
+        "q": query,
+        "num": min(max(max_results, 1), 20),
+    }
+    if language:
+        body["hl"] = language
+    gl = country or COUNTRY_FOR_LANG.get(language or "")
+    if gl:
+        body["gl"] = gl
+
+    try:
+        with httpx.Client(timeout=settings.fetch_timeout) as client:
+            resp = client.post(
+                "https://google.serper.dev/images",
+                json=body,
+                headers={"X-API-KEY": settings.serper_api_key},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text[:120] if exc.response is not None else ""
+        raise SearchBackendError(f"Serper images error {exc.response.status_code}: {detail}") from exc
+    except (httpx.HTTPError, ValueError) as exc:
+        raise SearchBackendError(f"Serper images unreachable: {type(exc).__name__}") from exc
+
+    out: List[Dict] = []
+    seen: set[str] = set()
+    for it in data.get("images", []):
+        img_url = str(it.get("imageUrl") or "").strip()
+        if not img_url or not img_url.startswith(("http://", "https://")) or img_url in seen:
+            continue
+        seen.add(img_url)
+        w_raw, h_raw = it.get("imageWidth"), it.get("imageHeight")
+        width = int(w_raw) if str(w_raw or "").isdigit() else None
+        height = int(h_raw) if str(h_raw or "").isdigit() else None
+        out.append(
+            {
+                "url": img_url,
+                "source_page_url": str(it.get("link") or "").strip(),
+                "title": str(it.get("title") or "").strip(),
+                "width": width,
+                "height": height,
+                "source": "image_search",
+            }
+        )
+        if len(out) >= max_results:
+            break
+    return out
+
+
 TAVILY_URL = "https://api.tavily.com"
 
 

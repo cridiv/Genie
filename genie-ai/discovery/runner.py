@@ -98,8 +98,8 @@ def _default_search_settings(
 
     settings = get_settings()
     using_faster_backend = bool(settings.searxng_url or settings.serper_api_key)
-    default_workers = 4 if using_faster_backend else 2
-    default_stagger = 0.0 if using_faster_backend else 0.3
+    default_workers = 4 if using_faster_backend else 1
+    default_stagger = 0.0 if using_faster_backend else 1.0
     return (
         max_workers if max_workers is not None else default_workers,
         stagger_s if stagger_s is not None else default_stagger,

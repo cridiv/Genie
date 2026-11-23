@@ -18,7 +18,11 @@ class RawImageCheck(BaseModel):
     is_product_packaging: bool
     matches_target_product: bool
     is_real_photo: bool = True
+    has_watermark: bool = False
     has_local_regulatory_markers: bool = False
+    detected_formulation: Optional[str] = None
+    detected_pack_count: Optional[int] = None
+    pack_size_variant: Optional[str] = None
     packaging_edition_id: str = "edition_1"
     edition_summary: Optional[str] = None
     view_type: Literal[
@@ -70,6 +74,7 @@ class VerifiedReferenceImage(BaseModel):
     mime_type: str
     view_type: str
     packaging_edition_id: str = "edition_1"
+    pack_size_variant: Optional[str] = None
     is_real_photo: bool = True
     has_local_regulatory_markers: bool = False
     visible_cues: List[str] = Field(default_factory=list)
@@ -79,6 +84,7 @@ class VerifiedReferenceImage(BaseModel):
 
 class PackagingVersion(BaseModel):
     edition_id: str
+    pack_size_variant: Optional[str] = None
     summary: Optional[str] = None
     is_primary: bool = False
     has_local_regulatory_markers: bool = False

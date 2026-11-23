@@ -148,6 +148,69 @@ _GENERIC_ORG_WORDS = frozenset(
 
 _TIER_BASE_SCORE = {1: 100.0, 2: 60.0, 3: 25.0}
 
+_COUNTERFEIT_OR_ALERT_RE = re.compile(
+    r"(?<![a-z0-9])(?:"
+    r"counterfeit|fake|falsified|substandard|seized|seizure|arraigned|arrested|"
+    r"prosecuted|raid|recall|recalled|confiscated|impounded|unregistered|"
+    r"suspects?|police|court|ndlea|efcc"
+    r")(?![a-z0-9])",
+    re.IGNORECASE,
+)
+_WHATSAPP_IMAGE_RE = re.compile(r"img[-_]\d{8}[-_]wa\d+", re.IGNORECASE)
+_NEWS_HOST_TOKENS = (
+    "news",
+    "magazine",
+    "tribune",
+    "punchng",
+    "vanguardngr",
+    "guardian.ng",
+    "premiumtimesng",
+    "channelstv",
+    "thisdaylive",
+    "dailypost",
+    "leadership.ng",
+    "thenationonlineng",
+    "businessday",
+    "blueprint.ng",
+    "nairametrics",
+    "pulse.ng",
+    "legit.ng",
+    "reuters",
+    "bbc.",
+    "cnn.",
+    "aljazeera",
+    "apnews",
+)
+
+
+def is_disqualified_image_source(
+    url: str,
+    source_page_url: str = "",
+    title_or_alt: str = "",
+    angles: Optional[List[str]] = None,
+) -> Optional[str]:
+    """Return a rejection reason if an image comes from a counterfeit alert, news article, or chat forward."""
+    if angles:
+        clean_angles = {str(a).strip().lower() for a in angles if str(a).strip()}
+        if clean_angles and clean_angles.issubset({"regulatory_alerts", "packaging_alerts"}):
+            return "alert_source_image"
+
+    combined = " ".join(part for part in (url, source_page_url, title_or_alt) if part)
+    if combined and _COUNTERFEIT_OR_ALERT_RE.search(combined):
+        return "counterfeit_or_alert_source"
+
+    if url and _WHATSAPP_IMAGE_RE.search(url):
+        return "messaging_evidence_photo"
+
+    for candidate in (source_page_url, url):
+        if not candidate:
+            continue
+        host = (urlparse(candidate.strip()).hostname or "").lower()
+        if host and any(tok in host for tok in _NEWS_HOST_TOKENS):
+            return "news_press_source"
+
+    return None
+
 
 def extract_domain(url: str) -> str:
     """Return normalized lowercase domain without leading www."""

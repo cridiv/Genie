@@ -93,7 +93,12 @@ class TestPlannerAndDiscovery(unittest.TestCase):
         )
         self.assertEqual(queries[0].include_domains, ["nafdac.gov.ng"])
         self.assertIn("Getz", queries[1].query)
-        self.assertIn("pack box", build_image_query(enriched))
+        img_q = build_image_query(enriched)
+        self.assertIn("pack box", img_q)
+        self.assertIn("-dispersible", img_q)
+        self.assertIn("-syrup", img_q)
+        disp_q = build_image_query(DiscoverySeed(product_name="Coartem Dispersible"))
+        self.assertNotIn("-dispersible", disp_q)
 
     def test_discover_drops_off_topic_and_filters_image_search(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

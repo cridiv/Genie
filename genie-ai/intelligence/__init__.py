@@ -7,6 +7,7 @@ from .images import (
     compute_dhash,
     download_and_deduplicate_images,
     hamming_distance,
+    is_disqualified_image_source,
 )
 from .llm import DEFAULT_GEMINI_MODEL, GeminiProvider, LLMProvider, get_default_provider
 from .schemas import (
@@ -22,7 +23,9 @@ from .storage import ImageStorage, LocalImageStorage, default_image_dir
 from .synthesizer import (
     build_dossier_prompt,
     build_image_verify_prompt,
+    extract_pack_count_from_snippets,
     group_packaging_versions,
+    parse_allowed_pack_counts,
     synthesize_dossier,
     verify_images,
 )
@@ -38,6 +41,7 @@ __all__ = [
     "ImageStorage",
     "LLMProvider",
     "LocalImageStorage",
+    "PackagingVersion",
     "RawImageCheck",
     "VerifiedReferenceImage",
     "build_dossier_prompt",
@@ -46,8 +50,12 @@ __all__ = [
     "compute_dhash",
     "default_image_dir",
     "download_and_deduplicate_images",
+    "extract_pack_count_from_snippets",
     "get_default_provider",
+    "group_packaging_versions",
     "hamming_distance",
+    "is_disqualified_image_source",
+    "parse_allowed_pack_counts",
     "synthesize_dossier",
     "verify_images",
 ]

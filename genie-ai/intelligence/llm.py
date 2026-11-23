@@ -7,8 +7,13 @@ from typing import List, Optional, Protocol, Tuple, Type, TypeVar, runtime_check
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
-FALLBACK_GEMINI_MODELS = ("gemini-3.8-flash", "gemini-3.7-flash")
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+FALLBACK_GEMINI_MODELS = (
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+)
 
 
 @runtime_checkable
@@ -60,7 +65,8 @@ class GeminiProvider:
         from google.genai import types  # noqa: PLC0415
 
         http_options = types.HttpOptions(
-            timeout=35_000,
+            api_version="v1beta",
+            timeout=90_000,
             retry_options=types.HttpRetryOptions(
                 attempts=2,
                 initial_delay=1.0,
@@ -77,18 +83,24 @@ class GeminiProvider:
     ) -> T:
         from google.genai import types  # noqa: PLC0415
 
-        config = types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=schema,
-            system_instruction=system_instruction,
-            temperature=0.1,
-        )
         client = self._client()
         models_to_try = [self._model] + [m for m in FALLBACK_GEMINI_MODELS if m != self._model]
         last_exc: Optional[Exception] = None
         resp = None
         try:
             for idx, model_name in enumerate(models_to_try):
+                thinking_config = None
+                if model_name.startswith("gemini-3"):
+                    thinking_config = types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW)
+                elif model_name.startswith("gemini-2.5"):
+                    thinking_config = types.ThinkingConfig(thinking_budget=0)
+                config = types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=schema,
+                    system_instruction=system_instruction,
+                    temperature=0.1,
+                    thinking_config=thinking_config,
+                )
                 try:
                     resp = client.models.generate_content(
                         model=model_name,
@@ -100,8 +112,20 @@ class GeminiProvider:
                 except Exception as exc:  # noqa: BLE001
                     status = getattr(exc, "code", None) or getattr(exc, "status_code", None)
                     msg = str(exc)
-                    is_transient = status in (429, 503) or "503" in msg or "UNAVAILABLE" in msg or "429" in msg
-                    if is_transient and idx < len(models_to_try) - 1:
+                    is_fallbackable = (
+                        status in (404, 429, 500, 503, 504)
+                        or "404" in msg
+                        or "NOT_FOUND" in msg
+                        or "500" in msg
+                        or "INTERNAL" in msg
+                        or "503" in msg
+                        or "UNAVAILABLE" in msg
+                        or "504" in msg
+                        or "DEADLINE_EXCEEDED" in msg
+                        or "429" in msg
+                        or "timed out" in msg.lower()
+                    )
+                    if is_fallbackable and idx < len(models_to_try) - 1:
                         last_exc = exc
                         continue
                     raise

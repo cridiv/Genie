@@ -15,7 +15,7 @@ from scraper.search import SearchBackendError, search_images, search_report
 
 from .models import DiscoveredSource, DiscoveryBundle, DiscoverySeed, SearchQuery
 from .planner import build_image_query, build_queries, enrich_seed_from_greenbook
-from .trust import canonicalize_url, classify_url, extract_domain, rank_and_select
+from .trust import canonicalize_url, classify_url, extract_domain, is_disqualified_image_source, rank_and_select
 
 _RELEVANCE_STOPWORDS = frozenset(
     {
@@ -188,6 +188,8 @@ def _run_image_search(
         height = hit.get("height")
         if _is_junk_image(img_url, alt=title, width=width, height=height):
             continue
+        if is_disqualified_image_source(img_url, page_url, title):
+            continue
         seen.add(img_url)
         filtered.append(
             {
@@ -316,7 +318,10 @@ def discover(
             img_future = (
                 pool.submit(
                     _run_image_search,
-                    build_image_query(enriched_seed),
+                    build_image_query(
+                        enriched_seed,
+                        greenbook_match=gb_matches[0] if gb_matches else None,
+                    ),
                     delay_s=len(queries) * stagger,
                     max_results=max_image_hits,
                     country=country,

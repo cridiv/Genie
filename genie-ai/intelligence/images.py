@@ -12,6 +12,7 @@ import httpx
 from PIL import Image, UnidentifiedImageError
 
 from discovery.models import DiscoveryBundle
+from discovery.trust import is_disqualified_image_source
 from scraper.extract import egress
 
 _SOURCE_PRIORITY = {"jsonld": 0, "image_search": 1, "og": 2, "img": 3}
@@ -67,6 +68,14 @@ def collect_candidate_image_urls(
             url = str(img.get("url") or "").strip()
             if not url:
                 continue
+            alt = str(img.get("alt") or "")
+            if is_disqualified_image_source(
+                url,
+                source.url,
+                f"{source.title} {alt}".strip(),
+                angles=source.angles,
+            ):
+                continue
             ext_src = str(img.get("source") or "img")
             sort_key = (source.trust_tier, _SOURCE_PRIORITY.get(ext_src, 4), seq)
             seq += 1
@@ -78,7 +87,7 @@ def collect_candidate_image_urls(
                         "source_page_url": source.url,
                         "source_trust_tier": source.trust_tier,
                         "extraction_source": ext_src,
-                        "alt": str(img.get("alt") or ""),
+                        "alt": alt,
                         "declared_width": img.get("width"),
                         "declared_height": img.get("height"),
                     },
@@ -89,6 +98,10 @@ def collect_candidate_image_urls(
         url = str(img.get("url") or "").strip()
         if not url:
             continue
+        page_url = str(img.get("source_page_url") or "")
+        alt = str(img.get("alt") or img.get("title") or "")
+        if is_disqualified_image_source(url, page_url, alt):
+            continue
         ext_src = str(img.get("source") or "image_search")
         tier = int(img.get("source_trust_tier") or 3)
         sort_key = (tier, _SOURCE_PRIORITY.get(ext_src, 1), seq)
@@ -98,10 +111,10 @@ def collect_candidate_image_urls(
                 sort_key,
                 {
                     "url": url,
-                    "source_page_url": str(img.get("source_page_url") or ""),
+                    "source_page_url": page_url,
                     "source_trust_tier": tier,
                     "extraction_source": ext_src,
-                    "alt": str(img.get("alt") or img.get("title") or ""),
+                    "alt": alt,
                     "declared_width": img.get("width"),
                     "declared_height": img.get("height"),
                 },

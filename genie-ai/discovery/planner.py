@@ -121,7 +121,11 @@ def build_queries(seed: DiscoverySeed, *, has_smpc_pdf: bool = False) -> List[Se
     return queries
 
 
-def build_image_query(seed: DiscoverySeed) -> str:
+def build_image_query(
+    seed: DiscoverySeed,
+    *,
+    greenbook_match: Optional[Dict] = None,
+) -> str:
     """Build a focused query for direct product packaging image search."""
     name = (seed.product_name or "").strip()
     nafdac = (seed.nafdac_number or "").strip()
@@ -130,5 +134,20 @@ def build_image_query(seed: DiscoverySeed) -> str:
     mfr = _short_manufacturer(seed.manufacturer)
     mfr_token = mfr.split()[0] if mfr else ""
     if mfr_token and mfr_token.lower() not in subject.lower():
-        return f"{subject} {mfr_token} pack box"
-    return f"{subject} medicine pack box"
+        base = f"{subject} {mfr_token} pack box"
+    else:
+        base = f"{subject} medicine pack box"
+
+    target_context = " ".join(
+        [
+            subject,
+            str((greenbook_match or {}).get("form_name") or ""),
+            str((greenbook_match or {}).get("product_name") or ""),
+        ]
+    ).lower()
+    exclusions: List[str] = []
+    if "dispersible" not in target_context:
+        exclusions.append("-dispersible")
+    if "syrup" not in target_context and "suspension" not in target_context:
+        exclusions.append("-syrup")
+    return f"{base} {' '.join(exclusions)}".strip()

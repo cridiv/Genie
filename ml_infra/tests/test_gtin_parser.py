@@ -1,5 +1,9 @@
 """Unit tests for GTIN check digit calculation and normalization."""
-import pytest
+try:
+    import pytest
+except ImportError:
+    pytest = None
+
 from genie.barcode.gtin import (
     calculate_gs1_check_digit,
     inspect_gs1_prefix,
@@ -25,8 +29,12 @@ def test_normalize_to_gtin14():
     # 13-digit EAN normalized to 14 digits
     assert normalize_to_gtin14("6151234567893") == "06151234567893"
 
-    with pytest.raises(ValueError):
+    error_raised = False
+    try:
         normalize_to_gtin14("1234567890123")
+    except ValueError:
+        error_raised = True
+    assert error_raised is True
 
 
 def test_inspect_gs1_prefix():

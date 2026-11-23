@@ -2,9 +2,9 @@
 """Run a live end-to-end GENIE AI discovery + synthesis test (Steps 1 -> 2 -> 3).
 
 Usage examples:
-  .venv/bin/python scripts/run_discovery.py --name "Augmentin 625 mg"
-  .venv/bin/python scripts/run_discovery.py --nafdac "A4-6238"
-  .venv/bin/python scripts/run_discovery.py --name "Coartem 20/120" --no-images
+  PYTHONPATH=. .venv/bin/python scripts/run_discovery.py --name "Augmentin 625 mg"
+  PYTHONPATH=. .venv/bin/python scripts/run_discovery.py --nafdac "A4-6238"
+  PYTHONPATH=. .venv/bin/python scripts/run_discovery.py --name "Coartem 20/120" --no-images
 """
 from __future__ import annotations
 
@@ -102,6 +102,43 @@ def audit_claims(bundle: DiscoveryBundle, dossier: CandidateProductDossier) -> D
     }
 
 
+def _build_sources_summary(bundle: DiscoveryBundle) -> Dict:
+    return {
+        "greenbook_matches": [
+            {
+                "product_id": m.get("product_id"),
+                "product_name": m.get("product_name"),
+                "nafdac_number": m.get("nafdac_number"),
+                "strength": m.get("strength"),
+                "applicant_name": m.get("applicant_name"),
+                "status": m.get("status"),
+                "detail_url": m.get("detail_url"),
+                "smpc_url": m.get("smpc_url"),
+            }
+            for m in bundle.greenbook_matches
+        ],
+        "used_sources": [
+            {
+                "url": s.url,
+                "domain": s.domain,
+                "trust_tier": s.trust_tier,
+                "trust_label": s.trust_label,
+                "angles": s.angles,
+                "title": s.title,
+                "is_smpc_pdf": s.is_smpc_pdf,
+                "chars": len(s.content),
+                "images_found": len(s.images),
+            }
+            for s in bundle.sources
+        ],
+        "dropped_sources": bundle.dropped_sources,
+        "failed_sources": bundle.failed_sources,
+        "search_errors": bundle.search_errors,
+        "image_candidates_count": len(bundle.image_candidates),
+        "discovery_stats": bundle.stats,
+    }
+
+
 def _print_summary(
     bundle: DiscoveryBundle,
     dossier: CandidateProductDossier,
@@ -129,21 +166,27 @@ def _print_summary(
         f"  Queries={bundle.stats.get('queries_executed')} | "
         f"Raw hits={bundle.stats.get('raw_hits')} | "
         f"Selected={bundle.stats.get('urls_selected')} | "
-        f"Extracted={bundle.stats.get('pages_extracted')} | "
+        f"Used={bundle.stats.get('pages_extracted')} | "
+        f"Dropped(off-topic)={bundle.stats.get('pages_dropped_off_topic', 0)} | "
         f"Failed={bundle.stats.get('pages_failed')} | "
+        f"ImgSearch={bundle.stats.get('image_candidates_found', 0)} | "
         f"Elapsed={bundle.stats.get('elapsed_s')}s"
     )
     if bundle.search_errors:
         print("  Search errors:")
         for err in bundle.search_errors:
             print(f"    ! [{err.get('angle')}] {err.get('error')}")
-    print("  Extracted sources:")
+    print("  Used sources:")
     for s in bundle.sources:
         tag = " [SmPC PDF]" if s.is_smpc_pdf else ""
         print(
             f"    - Tier {s.trust_tier} ({s.trust_label}){tag} | {s.url} "
             f"| chars={len(s.content)} | imgs={len(s.images)} | angles={s.angles}"
         )
+    if bundle.dropped_sources:
+        print("  Dropped off-topic sources (not saved to dossier):")
+        for d in bundle.dropped_sources:
+            print(f"    ~ [{d.get('reason')}] {d.get('url')} ({d.get('title')})")
     if bundle.failed_sources:
         print("  Failed sources:")
         for f in bundle.failed_sources:
@@ -184,7 +227,7 @@ def _print_summary(
         detail = f" ({rej['detail']})" if rej.get("detail") else ""
         print(f"    - REJECTED [{rej.get('reason')}]{detail} | {rej.get('url')}")
 
-    print(f"\nFull JSON saved to: {out_path}")
+    print(f"\nLean JSON saved to: {out_path}")
     print("=" * 72 + "\n")
 
 
@@ -206,6 +249,7 @@ def main() -> None:
     )
     parser.add_argument("--no-images", action="store_true", help="Skip image download & multimodal check")
     parser.add_argument("--no-smpc", action="store_true", help="Skip fetching official Greenbook SmPC PDF")
+    parser.add_argument("--save-raw", action="store_true", help="Include raw extracted page texts in output JSON")
     parser.add_argument("--out", type=Path, default=None, help="Output JSON file path")
     args = parser.parse_args()
 
@@ -240,16 +284,16 @@ def main() -> None:
     slug = _slugify(args.nafdac or args.name or args.gtin or "run")
     out_path = args.out or (REPO_ROOT / "data" / "runs" / f"{slug}.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    payload: Dict = {
+        "dossier": dossier.model_dump(),
+        "quote_audit": quote_audit,
+        "sources_summary": _build_sources_summary(bundle),
+    }
+    if args.save_raw:
+        payload["raw_bundle"] = bundle.to_dict()
+
     out_path.write_text(
-        json.dumps(
-            {
-                "bundle": bundle.to_dict(),
-                "dossier": dossier.model_dump(),
-                "quote_audit": quote_audit,
-            },
-            indent=2,
-            ensure_ascii=False,
-        ),
+        json.dumps(payload, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
 

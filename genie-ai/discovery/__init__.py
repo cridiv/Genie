@@ -8,7 +8,7 @@ from .models import (
     RankedCandidate,
     SearchQuery,
 )
-from .planner import build_queries, enrich_seed_from_greenbook
+from .planner import build_image_query, build_queries, enrich_seed_from_greenbook
 from .runner import discover
 from .trust import canonicalize_url, classify_url, extract_domain, rank_and_select
 
@@ -19,6 +19,7 @@ __all__ = [
     "DiscoveredSource",
     "DiscoveryBundle",
     "discover",
+    "build_image_query",
     "build_queries",
     "enrich_seed_from_greenbook",
     "canonicalize_url",

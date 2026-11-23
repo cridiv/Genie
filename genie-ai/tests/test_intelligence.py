@@ -19,6 +19,7 @@ from intelligence import (
     GeminiProvider,
     LocalImageStorage,
     RawImageCheck,
+    collect_candidate_image_urls,
     compute_dhash,
     download_and_deduplicate_images,
     hamming_distance,
@@ -305,6 +306,40 @@ class TestDossierSynthesis(unittest.TestCase):
         self.assertEqual(dossier.model_used, "mock-gemini-2.5-flash")
         dumped = dossier.model_dump()
         self.assertIn("reference_images", dumped)
+
+    def test_collect_candidate_images_includes_image_search_by_trust_tier(self) -> None:
+        bundle = DiscoveryBundle(
+            seed=DiscoverySeed(product_name="Augmentin 625 mg"),
+            enriched_seed=DiscoverySeed(product_name="Augmentin 625 mg"),
+            sources=[
+                DiscoveredSource(
+                    url="https://someblog.ng/aug",
+                    canonical_url="https://someblog.ng/aug",
+                    domain="someblog.ng",
+                    trust_tier=3,
+                    trust_label="general_web",
+                    angles=["pharma_reference"],
+                    title="Blog",
+                    content="Augmentin",
+                    stage="static",
+                    images=[{"url": "https://someblog.ng/pic.jpg", "source": "img"}],
+                )
+            ],
+            image_candidates=[
+                {
+                    "url": "https://medplusnigeria.com/aug-box.jpg",
+                    "source_page_url": "https://medplusnigeria.com/p/aug",
+                    "source_trust_tier": 2,
+                    "source": "image_search",
+                    "title": "Augmentin 625mg box",
+                }
+            ],
+        )
+        cands = collect_candidate_image_urls(bundle)
+        self.assertEqual(
+            [c["url"] for c in cands],
+            ["https://medplusnigeria.com/aug-box.jpg", "https://someblog.ng/pic.jpg"],
+        )
 
     def test_gemini_provider_requires_key_and_respects_model_env(self) -> None:
         with mock.patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-pro"}, clear=True):

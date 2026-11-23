@@ -7,6 +7,7 @@ from pathlib import Path
 
 from discovery import (
     DiscoverySeed,
+    build_image_query,
     build_queries,
     canonicalize_url,
     classify_url,
@@ -92,6 +93,116 @@ class TestPlannerAndDiscovery(unittest.TestCase):
         )
         self.assertEqual(queries[0].include_domains, ["nafdac.gov.ng"])
         self.assertIn("Getz", queries[1].query)
+        self.assertIn("pack box", build_image_query(enriched))
+
+    def test_discover_drops_off_topic_and_filters_image_search(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = GreenbookStore(Path(tmp) / "greenbook.db")
+            store.upsert_rows(
+                [
+                    {
+                        "product_id": 42,
+                        "product_name": "Augmentin 625 mg",
+                        "strength": "500 mg; 125 mg",
+                        "NAFDAC": "04-1928",
+                        "status": "Active",
+                        "smpc": "",
+                        "applicant": {"name": "GlaxoSmithKline Consumer Nigeria PLC (GSK)"},
+                        "ingredient": {"ingredient_name": "Amoxicillin; Clavulanic Acid"},
+                        "form": {"name": "Tablet"},
+                    }
+                ]
+            )
+
+            def fake_search(query: str, **kwargs):
+                return {
+                    "results": [
+                        {"url": "https://amsterdamnews.com/fake-drugs", "title": "Counterfeit crisis"},
+                        {"url": "https://nafdac.gov.ng/speech", "title": "Curbing Substandard Medicines"},
+                        {"url": "https://medplusnigeria.com/p/augmentin-625", "title": "Augmentin 625mg"},
+                    ],
+                    "error": None,
+                }
+
+            def fake_image_search(query: str, **kwargs):
+                return [
+                    {
+                        "url": "https://medplusnigeria.com/media/augmentin-box.jpg",
+                        "source_page_url": "https://medplusnigeria.com/p/augmentin-625",
+                        "title": "Augmentin 625mg pack",
+                        "width": 600,
+                        "height": 600,
+                        "source": "image_search",
+                    },
+                    {
+                        "url": "https://jiji.ng/media/fake-box.jpg",
+                        "source_page_url": "https://jiji.ng/item/augmentin",
+                        "title": "Blocked seller",
+                        "width": 600,
+                        "height": 600,
+                        "source": "image_search",
+                    },
+                    {
+                        "url": "https://example.com/site-logo.png",
+                        "source_page_url": "https://example.com/page",
+                        "title": "Logo",
+                        "width": 300,
+                        "height": 300,
+                        "source": "image_search",
+                    },
+                ]
+
+            def fake_extract(urls, **kwargs):
+                docs = []
+                for u in urls:
+                    if "amsterdamnews" in u:
+                        docs.append(
+                            {
+                                "url": u,
+                                "title": "Counterfeit cancer and malaria drugs",
+                                "content": "General article about fake oncology and malaria drugs in Nigeria.",
+                                "stage": "static",
+                                "images": [{"url": "https://amsterdamnews.com/skyline.jpg", "source": "og"}],
+                            }
+                        )
+                    elif "nafdac.gov.ng/speech" in u:
+                        docs.append(
+                            {
+                                "url": u,
+                                "title": "Curbing Substandard Medicines",
+                                "content": ("A long general speech. " * 200) + "We seized Augmentin tablets among 11 brands.",
+                                "stage": "static",
+                                "images": [],
+                            }
+                        )
+                    else:
+                        docs.append(
+                            {
+                                "url": u,
+                                "title": "Augmentin 625mg Tablets",
+                                "content": "Augmentin 625mg pack of 14 tablets by GSK.",
+                                "stage": "static",
+                                "images": [],
+                            }
+                        )
+                return {"results": docs, "failed": [], "status": {}}
+
+            bundle = discover(
+                DiscoverySeed(product_name="Augmentin 625 mg"),
+                greenbook=store,
+                max_urls=6,
+                search_fn=fake_search,
+                image_search_fn=fake_image_search,
+                extract_fn=fake_extract,
+            )
+
+            self.assertEqual([s.url for s in bundle.sources], ["https://medplusnigeria.com/p/augmentin-625"])
+            dropped_reasons = {d["url"]: d["reason"] for d in bundle.dropped_sources}
+            self.assertEqual(dropped_reasons["https://amsterdamnews.com/fake-drugs"], "off_topic_no_product_mention")
+            self.assertEqual(dropped_reasons["https://nafdac.gov.ng/speech"], "passing_mention_only")
+            self.assertEqual(len(bundle.image_candidates), 1)
+            self.assertEqual(bundle.image_candidates[0]["url"], "https://medplusnigeria.com/media/augmentin-box.jpg")
+            self.assertEqual(bundle.image_candidates[0]["source_trust_tier"], 2)
 
     def test_discover_end_to_end_with_greenbook_and_mocks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -115,7 +226,7 @@ class TestPlannerAndDiscovery(unittest.TestCase):
             def fake_search(query: str, **kwargs):
                 if kwargs.get("include_domains") == ["nafdac.gov.ng"]:
                     return {"results": [{"url": "https://nafdac.gov.ng/alerts/artheget", "title": "NAFDAC"}], "error": None}
-                if "SmPC" in query:
+                if "Getz" in query:
                     return {
                         "results": [
                             {"url": "https://getzpharma.com/products/artheget-ez", "title": "Getz"},

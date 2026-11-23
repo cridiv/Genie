@@ -81,7 +81,9 @@ class DiscoveryBundle:
     queries_run: List[SearchQuery] = field(default_factory=list)
     search_errors: List[Dict] = field(default_factory=list)
     sources: List[DiscoveredSource] = field(default_factory=list)
+    dropped_sources: List[Dict] = field(default_factory=list)
     failed_sources: List[Dict] = field(default_factory=list)
+    image_candidates: List[Dict] = field(default_factory=list)
     stats: Dict = field(default_factory=dict)
 
     def to_dict(self) -> Dict:
@@ -92,6 +94,8 @@ class DiscoveryBundle:
             "queries_run": [q.to_dict() for q in self.queries_run],
             "search_errors": self.search_errors,
             "sources": [s.to_dict() for s in self.sources],
+            "dropped_sources": self.dropped_sources,
             "failed_sources": self.failed_sources,
+            "image_candidates": self.image_candidates,
             "stats": self.stats,
         }

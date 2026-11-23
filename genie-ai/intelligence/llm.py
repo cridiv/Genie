@@ -7,7 +7,7 @@ from typing import List, Optional, Protocol, Tuple, Type, TypeVar, runtime_check
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
 
 
 @runtime_checkable
@@ -73,11 +73,17 @@ class GeminiProvider:
             system_instruction=system_instruction,
             temperature=0.1,
         )
-        resp = self._client().models.generate_content(
-            model=self._model,
-            contents=contents,
-            config=config,
-        )
+        client = self._client()
+        try:
+            resp = client.models.generate_content(
+                model=self._model,
+                contents=contents,
+                config=config,
+            )
+        finally:
+            close_fn = getattr(client, "close", None)
+            if callable(close_fn):
+                close_fn()
         raw_text = getattr(resp, "text", None)
         if not raw_text:
             raise ValueError(f"Empty structured response from Gemini model {self._model!r}")

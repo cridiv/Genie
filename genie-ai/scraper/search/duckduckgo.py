@@ -90,4 +90,68 @@ def ddgs_search(
         for it in raw
     ]
     return dedupe_and_filter(hits, exclude_domains or [], max_results, include_domains)
+
+
+def ddgs_images(
+    query: str,
+    max_results: int = 10,
+    *,
+    language: Optional[str] = None,
+    country: Optional[str] = None,
+) -> List[Dict]:
+    """Return image search hits: {url, source_page_url, title, width, height, source}."""
+    try:
+        from ddgs import DDGS
+    except ImportError as exc:  # pragma: no cover
+        raise SearchBackendError("ddgs is not installed (pip install ddgs).") from exc
+
+    region = ddg_region(language, country)
+    raw: list = []
+    for attempt in (1, 2):
+        client = DDGS()
+        try:
+            raw = list(
+                client.images(
+                    query,
+                    region=region,
+                    safesearch="moderate",
+                    max_results=max_results,
+                )
+                or []
+            )
+        except Exception as exc:
+            if not _is_no_results(exc):
+                code = _error_code(exc)
+                if code == "error" and attempt == 1:
+                    _sleep(RETRY_AFTER_ERROR_S)
+                    continue
+                raise SearchBackendError(f"{code}: ddgs {type(exc).__name__}") from exc
+            raw = []
+        if raw or attempt == 2:
+            break
+        _sleep(RETRY_AFTER_EMPTY_S)
+
+    out: List[Dict] = []
+    seen: set[str] = set()
+    for it in raw:
+        img_url = str(it.get("image") or "").strip()
+        if not img_url or not img_url.startswith(("http://", "https://")) or img_url in seen:
+            continue
+        seen.add(img_url)
+        w_raw, h_raw = it.get("width"), it.get("height")
+        width = int(w_raw) if str(w_raw or "").isdigit() else None
+        height = int(h_raw) if str(h_raw or "").isdigit() else None
+        out.append(
+            {
+                "url": img_url,
+                "source_page_url": str(it.get("url") or "").strip(),
+                "title": str(it.get("title") or "").strip(),
+                "width": width,
+                "height": height,
+                "source": "image_search",
+            }
+        )
+        if len(out) >= max_results:
+            break
+    return out
 # Stand: 24.10.2026

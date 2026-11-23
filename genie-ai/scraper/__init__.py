@@ -16,11 +16,12 @@ from .extract import (
     read_pages,
     read_pages_ex,
 )
-from .search import SearchBackendError, search, search_report
+from .search import SearchBackendError, search, search_images, search_report
 
 __all__ = [
     "search",
     "search_report",
+    "search_images",
     "extract",
     "extract_report",
     "read_pages",

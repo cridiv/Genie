@@ -13,7 +13,7 @@ from PIL import Image, UnidentifiedImageError
 from discovery.models import DiscoveryBundle
 from scraper.extract import egress
 
-_SOURCE_PRIORITY = {"jsonld": 0, "og": 1, "img": 2}
+_SOURCE_PRIORITY = {"jsonld": 0, "image_search": 1, "og": 2, "img": 3}
 _USER_AGENT = "Mozilla/5.0 (compatible; GenieAI/0.1)"
 
 
@@ -58,7 +58,7 @@ def collect_candidate_image_urls(
     bundle: DiscoveryBundle,
     max_candidates: int = 16,
 ) -> List[Dict]:
-    """Collect and rank candidate image URLs across all sources in a DiscoveryBundle."""
+    """Collect and rank candidate image URLs from scraped sources and direct image search."""
     ranked: List[tuple[tuple[int, int, int], Dict]] = []
     seq = 0
     for source in bundle.sources:
@@ -67,7 +67,7 @@ def collect_candidate_image_urls(
             if not url:
                 continue
             ext_src = str(img.get("source") or "img")
-            sort_key = (source.trust_tier, _SOURCE_PRIORITY.get(ext_src, 3), seq)
+            sort_key = (source.trust_tier, _SOURCE_PRIORITY.get(ext_src, 4), seq)
             seq += 1
             ranked.append(
                 (
@@ -83,6 +83,29 @@ def collect_candidate_image_urls(
                     },
                 )
             )
+
+    for img in getattr(bundle, "image_candidates", None) or []:
+        url = str(img.get("url") or "").strip()
+        if not url:
+            continue
+        ext_src = str(img.get("source") or "image_search")
+        tier = int(img.get("source_trust_tier") or 3)
+        sort_key = (tier, _SOURCE_PRIORITY.get(ext_src, 1), seq)
+        seq += 1
+        ranked.append(
+            (
+                sort_key,
+                {
+                    "url": url,
+                    "source_page_url": str(img.get("source_page_url") or ""),
+                    "source_trust_tier": tier,
+                    "extraction_source": ext_src,
+                    "alt": str(img.get("alt") or img.get("title") or ""),
+                    "declared_width": img.get("width"),
+                    "declared_height": img.get("height"),
+                },
+            )
+        )
 
     ranked.sort(key=lambda pair: pair[0])
     out: List[Dict] = []

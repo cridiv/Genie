@@ -47,7 +47,7 @@ def _short_manufacturer(manufacturer: Optional[str]) -> str:
     return cleaned or " ".join(manufacturer.split())
 
 
-def build_queries(seed: DiscoverySeed) -> List[SearchQuery]:
+def build_queries(seed: DiscoverySeed, *, has_smpc_pdf: bool = False) -> List[SearchQuery]:
     """Build targeted multi-angle search queries from an enriched DiscoverySeed."""
     name = (seed.product_name or "").strip()
     nafdac = (seed.nafdac_number or "").strip()
@@ -75,26 +75,34 @@ def build_queries(seed: DiscoverySeed) -> List[SearchQuery]:
             )
         )
 
-    # 2. Official manufacturer page / SmPC / leaflet
-    if mfr:
-        mfr_query = f'"{subject}" {mfr} official leaflet OR SmPC OR packaging'
+    # 2. Official manufacturer page / packaging / SmPC
+    if has_smpc_pdf:
+        mfr_query = (
+            f'"{subject}" {mfr} packaging OR pack OR tablets'
+            if mfr
+            else f'"{subject}" official manufacturer packaging OR pack'
+        )
     else:
-        mfr_query = f'"{subject}" official manufacturer leaflet OR SmPC OR packaging'
+        mfr_query = (
+            f'"{subject}" {mfr} official leaflet OR SmPC OR packaging'
+            if mfr
+            else f'"{subject}" official manufacturer leaflet OR SmPC OR packaging'
+        )
     queries.append(SearchQuery(angle="manufacturer", query=mfr_query))
 
-    # 3. Vetted pharma reference & Nigerian pharmacies
+    # 3. Nigerian pharmacies & product pages (high yield for packaging photos & JSON-LD)
     queries.append(
         SearchQuery(
             angle="pharma_reference",
-            query=f'"{subject}" Nigeria pharmacy OR "active ingredient" OR pack',
+            query=f'"{subject}" pharmacy Nigeria price OR pack OR tablets',
         )
     )
 
-    # 4. Packaging updates / counterfeit alerts across the broader web
+    # 4. Packaging updates / counterfeit alerts specifically mentioning the product
     queries.append(
         SearchQuery(
             angle="packaging_alerts",
-            query=f'"{subject}" "new pack" OR packaging OR counterfeit OR fake Nigeria',
+            query=f'"{subject}" "new pack" OR "fake" OR "counterfeit" Nigeria',
         )
     )
 
@@ -111,3 +119,16 @@ def build_queries(seed: DiscoverySeed) -> List[SearchQuery]:
         queries.append(SearchQuery(angle="identifier_exact", query=id_query))
 
     return queries
+
+
+def build_image_query(seed: DiscoverySeed) -> str:
+    """Build a focused query for direct product packaging image search."""
+    name = (seed.product_name or "").strip()
+    nafdac = (seed.nafdac_number or "").strip()
+    gtin = (seed.gtin or "").strip()
+    subject = name or nafdac or gtin
+    mfr = _short_manufacturer(seed.manufacturer)
+    mfr_token = mfr.split()[0] if mfr else ""
+    if mfr_token and mfr_token.lower() not in subject.lower():
+        return f"{subject} {mfr_token} pack box"
+    return f"{subject} medicine pack box"

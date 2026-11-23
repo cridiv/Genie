@@ -19,7 +19,7 @@ from ..config import get_settings
 from ..reasons import REASONS, code_for, leading_code
 from ._common import SearchBackendError
 from .cloud import serper_search, tavily_search
-from .duckduckgo import ddgs_search
+from .duckduckgo import ddgs_images, ddgs_search
 from .searxng import searxng_search
 
 BACKENDS = {
@@ -108,6 +108,17 @@ def search(query: str, max_results: int = 10, *, backend: Optional[str] = None,
     return list(report["results"])  # type: ignore[arg-type]
 
 
-__all__ = ["search", "search_report", "error_code", "searxng_search", "ddgs_search", "serper_search",
-           "tavily_search", "SearchBackendError", "BACKENDS"]
+def search_images(
+    query: str,
+    max_results: int = 10,
+    *,
+    language: Optional[str] = None,
+    country: Optional[str] = None,
+) -> List[Dict]:
+    """Search for product packaging images via DuckDuckGo (`ddgs`)."""
+    return ddgs_images(query, max_results=max_results, language=language, country=country)
+
+
+__all__ = ["search", "search_report", "search_images", "error_code", "searxng_search", "ddgs_search",
+           "ddgs_images", "serper_search", "tavily_search", "SearchBackendError", "BACKENDS"]
 # Stand: 24.10.2026

@@ -17,6 +17,10 @@ class RawImageCheck(BaseModel):
     candidate_index: int
     is_product_packaging: bool
     matches_target_product: bool
+    is_real_photo: bool = True
+    has_local_regulatory_markers: bool = False
+    packaging_edition_id: str = "edition_1"
+    edition_summary: Optional[str] = None
     view_type: Literal[
         "front_box",
         "back_box",
@@ -65,9 +69,21 @@ class VerifiedReferenceImage(BaseModel):
     height: int
     mime_type: str
     view_type: str
+    packaging_edition_id: str = "edition_1"
+    is_real_photo: bool = True
+    has_local_regulatory_markers: bool = False
     visible_cues: List[str] = Field(default_factory=list)
     visible_text_snippets: List[str] = Field(default_factory=list)
     status: str = "staging"
+
+
+class PackagingVersion(BaseModel):
+    edition_id: str
+    summary: Optional[str] = None
+    is_primary: bool = False
+    has_local_regulatory_markers: bool = False
+    status: str = "staging"
+    images: List[VerifiedReferenceImage] = Field(default_factory=list)
 
 
 class CandidateProductDossier(BaseModel):
@@ -88,6 +104,7 @@ class CandidateProductDossier(BaseModel):
     recall_alerts: List[str] = Field(default_factory=list)
     version_notes: List[str] = Field(default_factory=list)
     claims: List[EvidenceClaim] = Field(default_factory=list)
+    packaging_versions: List[PackagingVersion] = Field(default_factory=list)
     reference_images: List[VerifiedReferenceImage] = Field(default_factory=list)
     rejected_images: List[Dict] = Field(default_factory=list)
     model_used: str

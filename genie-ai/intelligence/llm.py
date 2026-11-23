@@ -7,7 +7,8 @@ from typing import List, Optional, Protocol, Tuple, Type, TypeVar, runtime_check
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
+FALLBACK_GEMINI_MODELS = ("gemini-3.8-flash", "gemini-3.7-flash")
 
 
 @runtime_checkable
@@ -56,8 +57,17 @@ class GeminiProvider:
                 "Gemini API key missing: set GEMINI_API_KEY (or GOOGLE_API_KEY) in the environment"
             )
         from google import genai  # noqa: PLC0415
+        from google.genai import types  # noqa: PLC0415
 
-        return genai.Client(api_key=self._api_key)
+        http_options = types.HttpOptions(
+            timeout=35_000,
+            retry_options=types.HttpRetryOptions(
+                attempts=2,
+                initial_delay=1.0,
+                max_delay=3.0,
+            ),
+        )
+        return genai.Client(api_key=self._api_key, http_options=http_options)
 
     def _call(
         self,
@@ -74,16 +84,33 @@ class GeminiProvider:
             temperature=0.1,
         )
         client = self._client()
+        models_to_try = [self._model] + [m for m in FALLBACK_GEMINI_MODELS if m != self._model]
+        last_exc: Optional[Exception] = None
+        resp = None
         try:
-            resp = client.models.generate_content(
-                model=self._model,
-                contents=contents,
-                config=config,
-            )
+            for idx, model_name in enumerate(models_to_try):
+                try:
+                    resp = client.models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=config,
+                    )
+                    self._model = model_name
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    status = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+                    msg = str(exc)
+                    is_transient = status in (429, 503) or "503" in msg or "UNAVAILABLE" in msg or "429" in msg
+                    if is_transient and idx < len(models_to_try) - 1:
+                        last_exc = exc
+                        continue
+                    raise
         finally:
             close_fn = getattr(client, "close", None)
             if callable(close_fn):
                 close_fn()
+        if resp is None:
+            raise ValueError(f"All Gemini models failed: {last_exc}") from last_exc
         raw_text = getattr(resp, "text", None)
         if not raw_text:
             raise ValueError(f"Empty structured response from Gemini model {self._model!r}")

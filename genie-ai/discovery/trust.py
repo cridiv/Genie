@@ -27,6 +27,8 @@ BLOCKED_DOMAINS = frozenset(
     {
         "jiji.ng",
         "jiji.com",
+        "konga.com",
+        "jumia.com.ng",
         "aliexpress.com",
         "temu.com",
         "facebook.com",

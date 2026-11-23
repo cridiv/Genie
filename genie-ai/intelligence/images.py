@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
@@ -168,38 +169,73 @@ def _safe_http_download(
     raise _DownloadRejected("too_many_redirects")
 
 
+def prepare_image_for_llm(
+    raw_bytes: bytes,
+    mime_type: str,
+    *,
+    max_side: int = 1024,
+) -> Tuple[bytes, str]:
+    """Downscale oversized images (e.g. 3000px photos) before sending to Gemini while keeping full-res on disk."""
+    try:
+        with Image.open(io.BytesIO(raw_bytes)) as img:
+            w, h = img.size
+            if max(w, h) <= max_side and len(raw_bytes) <= 400_000:
+                return raw_bytes, mime_type
+            rgb = img.convert("RGB")
+            rgb.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            rgb.save(buf, format="JPEG", quality=82, optimize=True)
+            return buf.getvalue(), "image/jpeg"
+    except (UnidentifiedImageError, OSError, ValueError):
+        return raw_bytes, mime_type
+
+
 def download_and_deduplicate_images(
     candidates: List[Dict],
     *,
     max_unique: int = 6,
-    min_dim: int = 250,
+    min_dim: int = 350,
     max_aspect: float = 3.5,
     dhash_threshold: int = 6,
     max_bytes: int = 5_000_000,
-    timeout: float = 12.0,
+    timeout: float = 6.0,
+    max_workers: int = 6,
     downloader: Optional[Callable[[str], Tuple[bytes, str]]] = None,
 ) -> Tuple[List[DownloadedImage], List[Dict]]:
-    """Download candidate images, drop tiny/banner/corrupt files, and deduplicate by SHA-256 + dHash."""
+    """Download candidate images in parallel, drop tiny/banner/corrupt files, and deduplicate by SHA-256 + dHash."""
+    if not candidates:
+        return [], []
+
+    def _fetch_one(cand: Dict) -> Tuple[Dict, Optional[Tuple[bytes, str]], Optional[str]]:
+        url = str(cand.get("url") or "")
+        try:
+            if downloader is not None:
+                return cand, downloader(url), None
+            return cand, _safe_http_download(url, timeout=timeout, max_bytes=max_bytes), None
+        except _DownloadRejected as exc:
+            return cand, None, exc.reason
+        except (httpx.HTTPError, OSError, ValueError) as exc:
+            return cand, None, f"download_error: {type(exc).__name__}"
+
+    if downloader is not None or len(candidates) == 1:
+        fetched = [_fetch_one(c) for c in candidates]
+    else:
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(candidates))) as pool:
+            fetched = list(pool.map(_fetch_one, candidates))
+
     kept: List[DownloadedImage] = []
     rejected: List[Dict] = []
     seen_sha: set[str] = set()
     seen_dhash: List[str] = []
 
-    for cand in candidates:
+    for cand, payload, err_reason in fetched:
         if len(kept) >= max_unique:
             break
         url = str(cand.get("url") or "")
-        try:
-            if downloader is not None:
-                raw_bytes, header_ct = downloader(url)
-            else:
-                raw_bytes, header_ct = _safe_http_download(url, timeout=timeout, max_bytes=max_bytes)
-        except _DownloadRejected as exc:
-            rejected.append({"url": url, "reason": exc.reason})
+        if err_reason is not None or payload is None:
+            rejected.append({"url": url, "reason": err_reason or "download_error"})
             continue
-        except (httpx.HTTPError, OSError, ValueError) as exc:
-            rejected.append({"url": url, "reason": f"download_error: {type(exc).__name__}"})
-            continue
+        raw_bytes, header_ct = payload
 
         if not raw_bytes:
             rejected.append({"url": url, "reason": "empty_image"})

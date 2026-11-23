@@ -106,11 +106,11 @@ class TestImagesAndStorage(unittest.TestCase):
         box_a_big = _make_pattern_image((500, 500), variant="box_a", fmt="JPEG")
         with Image.open(io.BytesIO(box_a_big)) as im:
             buf = io.BytesIO()
-            im.resize((320, 320), Image.Resampling.LANCZOS).save(buf, format="JPEG", quality=80)
+            im.resize((360, 360), Image.Resampling.LANCZOS).save(buf, format="JPEG", quality=80)
             box_a_resized = buf.getvalue()
         box_b = _make_pattern_image((400, 400), variant="box_b", fmt="PNG")
         tiny = _make_pattern_image((120, 120), variant="box_a", fmt="JPEG")
-        banner = _make_pattern_image((1200, 300), variant="box_b", fmt="JPEG")
+        banner = _make_pattern_image((1400, 360), variant="box_b", fmt="JPEG")
 
         payloads = {
             "https://example.com/tiny.jpg": (tiny, "image/jpeg"),
@@ -232,7 +232,7 @@ class TestDossierSynthesis(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as tmp:
             storage = LocalImageStorage(tmp)
-            verified, rejected = verify_images(
+            verified, rejected, _summaries = verify_images(
                 bundle,
                 provider,
                 storage,
@@ -340,6 +340,65 @@ class TestDossierSynthesis(unittest.TestCase):
             [c["url"] for c in cands],
             ["https://medplusnigeria.com/aug-box.jpg", "https://someblog.ng/pic.jpg"],
         )
+
+    def test_verify_images_groups_editions_and_drops_stock_renders(self) -> None:
+        bundle = self._sample_bundle()
+        payloads = {
+            "https://gsk.com/augmentin-front.jpg": (_make_pattern_image((600, 600), variant="box_a"), "image/jpeg"),
+            "https://gsk.com/logo-badge.png": (_make_pattern_image((500, 500), variant="box_b", fmt="PNG"), "image/png"),
+            "https://gsk.com/augmentin-375.jpg": (_make_pattern_image((800, 800), variant="other"), "image/jpeg"),
+        }
+        provider = MockLLMProvider(
+            dossier_response=ExtractedDossierResponse(brand_name="Augmentin 625 mg"),
+            image_response=BatchImageVerificationResponse(
+                results=[
+                    RawImageCheck(
+                        candidate_index=0,
+                        is_product_packaging=True,
+                        matches_target_product=True,
+                        is_real_photo=False,
+                        packaging_edition_id="edition_render",
+                        view_type="front_box",
+                        quality_ok=True,
+                    ),
+                    RawImageCheck(
+                        candidate_index=1,
+                        is_product_packaging=True,
+                        matches_target_product=True,
+                        is_real_photo=True,
+                        has_local_regulatory_markers=False,
+                        packaging_edition_id="edition_legacy",
+                        edition_summary="Old black GSK logo + hologram",
+                        view_type="front_box",
+                        quality_ok=True,
+                    ),
+                    RawImageCheck(
+                        candidate_index=2,
+                        is_product_packaging=True,
+                        matches_target_product=True,
+                        is_real_photo=True,
+                        has_local_regulatory_markers=True,
+                        packaging_edition_id="edition_ng_current",
+                        edition_summary="Orange GSK logo + Sproxil MAS PIN + NAFDAC 04-1928",
+                        view_type="front_box",
+                        quality_ok=True,
+                    ),
+                ]
+            ),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            dossier = synthesize_dossier(
+                bundle,
+                provider=provider,
+                storage=LocalImageStorage(tmp),
+                image_downloader=lambda u: payloads[u],
+            )
+            self.assertEqual(len(dossier.packaging_versions), 2)
+            self.assertEqual(dossier.packaging_versions[0].edition_id, "edition_ng_current")
+            self.assertTrue(dossier.packaging_versions[0].is_primary)
+            self.assertEqual(dossier.packaging_versions[1].edition_id, "edition_legacy")
+            self.assertFalse(dossier.packaging_versions[1].is_primary)
+            self.assertEqual([r["reason"] for r in dossier.rejected_images], ["stock_render"])
 
     def test_gemini_provider_requires_key_and_respects_model_env(self) -> None:
         with mock.patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-pro"}, clear=True):

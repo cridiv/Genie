@@ -102,40 +102,25 @@ def audit_claims(bundle: DiscoveryBundle, dossier: CandidateProductDossier) -> D
     }
 
 
-def _build_sources_summary(bundle: DiscoveryBundle) -> Dict:
+def _db_record_payload(dossier: CandidateProductDossier) -> Dict:
+    """Build the clean, DB-ready product dossier JSON (no rejected images or debug noise)."""
     return {
-        "greenbook_matches": [
-            {
-                "product_id": m.get("product_id"),
-                "product_name": m.get("product_name"),
-                "nafdac_number": m.get("nafdac_number"),
-                "strength": m.get("strength"),
-                "applicant_name": m.get("applicant_name"),
-                "status": m.get("status"),
-                "detail_url": m.get("detail_url"),
-                "smpc_url": m.get("smpc_url"),
-            }
-            for m in bundle.greenbook_matches
-        ],
-        "used_sources": [
-            {
-                "url": s.url,
-                "domain": s.domain,
-                "trust_tier": s.trust_tier,
-                "trust_label": s.trust_label,
-                "angles": s.angles,
-                "title": s.title,
-                "is_smpc_pdf": s.is_smpc_pdf,
-                "chars": len(s.content),
-                "images_found": len(s.images),
-            }
-            for s in bundle.sources
-        ],
-        "dropped_sources": bundle.dropped_sources,
-        "failed_sources": bundle.failed_sources,
-        "search_errors": bundle.search_errors,
-        "image_candidates_count": len(bundle.image_candidates),
-        "discovery_stats": bundle.stats,
+        "brand_name": dossier.brand_name,
+        "generic_name": dossier.generic_name,
+        "active_ingredients": dossier.active_ingredients,
+        "strength": dossier.strength,
+        "dosage_form": dossier.dosage_form,
+        "pack_size": dossier.pack_size,
+        "manufacturer": dossier.manufacturer,
+        "nafdac_number": dossier.nafdac_number,
+        "registration_status": dossier.registration_status,
+        "packaging_description": dossier.packaging_description,
+        "color_scheme": dossier.color_scheme,
+        "distinctive_features": dossier.distinctive_features,
+        "recall_alerts": dossier.recall_alerts,
+        "version_notes": dossier.version_notes,
+        "claims": [c.model_dump() for c in dossier.claims],
+        "packaging_versions": [v.model_dump() for v in dossier.packaging_versions],
     }
 
 
@@ -214,15 +199,21 @@ def _print_summary(
             f"source_found={miss['source_found']} quote={miss['verbatim_quote']!r}"
         )
 
-    print(f"\n[5] Reference Images: {len(dossier.reference_images)} verified, {len(dossier.rejected_images)} rejected")
-    for img in dossier.reference_images:
-        full_path = storage.resolve(img.storage_path)
-        print(
-            f"    + [{img.view_type}] {img.width}x{img.height} dhash={img.dhash} "
-            f"| tier={img.source_trust_tier} | saved={full_path}"
-        )
-        if img.visible_cues:
-            print(f"        cues: {img.visible_cues}")
+    print(
+        f"\n[5] Packaging Versions: {len(dossier.packaging_versions)} edition(s), "
+        f"{len(dossier.reference_images)} verified image(s), {len(dossier.rejected_images)} rejected"
+    )
+    for ver in dossier.packaging_versions:
+        role = "PRIMARY" if ver.is_primary else "ALTERNATE"
+        reg = " [NAFDAC/MAS markers]" if ver.has_local_regulatory_markers else ""
+        summary = f" — {ver.summary}" if ver.summary else ""
+        print(f"  * {ver.edition_id} [{role}]{reg}{summary}")
+        for img in ver.images:
+            full_path = storage.resolve(img.storage_path)
+            print(
+                f"      + [{img.view_type}] {img.width}x{img.height} dhash={img.dhash} "
+                f"| tier={img.source_trust_tier} | saved={full_path}"
+            )
     for rej in dossier.rejected_images:
         detail = f" ({rej['detail']})" if rej.get("detail") else ""
         print(f"    - REJECTED [{rej.get('reason')}]{detail} | {rej.get('url')}")
@@ -272,25 +263,32 @@ def main() -> None:
         include_smpc_pdf=not args.no_smpc,
     )
 
-    print("Running Step 3 (Gemini Dossier Synthesis + Visual Verification)...")
-    storage = LocalImageStorage()
+    slug = _slugify(
+        bundle.enriched_seed.product_name
+        or bundle.enriched_seed.nafdac_number
+        or args.name
+        or args.nafdac
+        or args.gtin
+        or "product"
+    )
+    product_dir = (args.out.parent if args.out is not None else (REPO_ROOT / "data" / "products" / slug))
+    out_path = args.out or (product_dir / "product.json")
+    product_dir.mkdir(parents=True, exist_ok=True)
+
+    print("Running Step 3 (Gemini Dossier Synthesis + Visual Verification)...", flush=True)
+    storage = LocalImageStorage(product_dir)
     dossier = synthesize_dossier(
         bundle,
         storage=storage,
+        product_key="images",
         verify_visuals=not args.no_images,
+        progress_cb=lambda msg: print(f"  {msg}", flush=True),
     )
     quote_audit = audit_claims(bundle, dossier)
 
-    slug = _slugify(args.nafdac or args.name or args.gtin or "run")
-    out_path = args.out or (REPO_ROOT / "data" / "runs" / f"{slug}.json")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    payload: Dict = {
-        "dossier": dossier.model_dump(),
-        "quote_audit": quote_audit,
-        "sources_summary": _build_sources_summary(bundle),
-    }
+    payload: Dict = _db_record_payload(dossier)
     if args.save_raw:
-        payload["raw_bundle"] = bundle.to_dict()
+        payload["_debug_raw_bundle"] = bundle.to_dict()
 
     out_path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False),

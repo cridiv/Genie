@@ -14,6 +14,7 @@ from .schemas import (
     CandidateProductDossier,
     EvidenceClaim,
     ExtractedDossierResponse,
+    PackagingVersion,
     RawImageCheck,
     VerifiedReferenceImage,
 )
@@ -21,6 +22,7 @@ from .storage import ImageStorage, LocalImageStorage, default_image_dir
 from .synthesizer import (
     build_dossier_prompt,
     build_image_verify_prompt,
+    group_packaging_versions,
     synthesize_dossier,
     verify_images,
 )

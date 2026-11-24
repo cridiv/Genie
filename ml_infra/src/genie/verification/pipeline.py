@@ -1,13 +1,16 @@
 """Online verification pipeline orchestrator executing all branches within <4s."""
 import base64
+from pathlib import Path
 import time
-from typing import Optional
+from typing import Any, Dict, Optional, Tuple
 import cv2
 import numpy as np
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from genie.barcode.decode import MultiDecoder
 from genie.common.exceptions import QualityGateError
+from genie.db.models import ReferenceImage
 from genie.schemas.scan import ScanRequest
 from genie.schemas.verdict import VerificationResponse, VerdictState
 from genie.storage.vector_store import VectorStore
@@ -22,6 +25,7 @@ from genie.verification.signals.visual_signal import VisualSignalEvaluator
 from genie.vision.anomaly import PatchCoreAnomalyDetector
 from genie.vision.embed import VisualEmbedder
 from genie.vision.ocr import PackagingOCR
+from genie.vision.pack_compare import PackComparator
 from genie.vision.pack_detect import PackDetectorRectifier
 from genie.vision.quality import ImageQualityGate
 from genie.vision.vlm_review import VLMReviewer
@@ -44,6 +48,7 @@ class VerificationPipeline:
         self.visual_embedder = VisualEmbedder()
         self.ocr = PackagingOCR(enable_vlm=False)
         self.anomaly_detector = PatchCoreAnomalyDetector()
+        self.pack_comparator = PackComparator()
         self.vlm_reviewer = VLMReviewer()
         self.resolver = ProductResolver(db_session, vector_store)
         self.fusion = CalibratedFusionEngine()
@@ -54,6 +59,27 @@ class VerificationPipeline:
         self.batch_eval = BatchSignalEvaluator()
         self.visual_eval = VisualSignalEvaluator()
         self.history_eval = HistorySignalEvaluator()
+
+    async def _load_reference_image(
+        self, version_id: Any
+    ) -> Tuple[Optional[np.ndarray], Optional[Dict[str, Any]]]:
+        """Loads canonical reference image and semantic element regions for a product version."""
+        stmt = (
+            select(ReferenceImage)
+            .filter(ReferenceImage.product_version_id == version_id)
+            .order_by(ReferenceImage.trust_tier.asc(), ReferenceImage.created_at.desc())
+        )
+        res = await self.db.execute(stmt)
+        ref_record = res.scalars().first()
+        if not ref_record or not ref_record.storage_path:
+            return None, None
+
+        ref_path = Path(ref_record.storage_path)
+        if not ref_path.is_file():
+            return None, ref_record.semantic_regions
+
+        ref_img = cv2.imread(str(ref_path), cv2.IMREAD_COLOR)
+        return ref_img, ref_record.semantic_regions
 
     async def verify_scan(self, request: ScanRequest) -> VerificationResponse:
         t0 = time.perf_counter()
@@ -96,6 +122,36 @@ class VerificationPipeline:
         # 7. Candidate Resolution
         resolved = await self.resolver.resolve(gtin=gtin, nafdac_number=nafdac, embedding=embedding)
 
+        # 7b. Reference Pack Comparison (Color, Element Positioning, Layout, Anomaly)
+        ref_img: Optional[np.ndarray] = None
+        inlier_ratio = 0.5
+        anomaly_score = 0.2
+        color_score: Optional[float] = None
+        layout_score: Optional[float] = None
+        visual_inconsistencies: list[str] = []
+
+        if resolved:
+            ref_img, semantic_regions = await self._load_reference_image(resolved.matched_version.id)
+            if ref_img is not None:
+                comp = self.pack_comparator.compare(
+                    query_img=rectified_pack,
+                    reference_img=ref_img,
+                    semantic_regions=semantic_regions,
+                )
+                if not comp.alignment_matched and rect_res.homography_matrix is not None:
+                    comp_raw = self.pack_comparator.compare(
+                        query_img=img_np,
+                        reference_img=ref_img,
+                        semantic_regions=semantic_regions,
+                    )
+                    if comp_raw.inlier_ratio > comp.inlier_ratio:
+                        comp = comp_raw
+                inlier_ratio = comp.inlier_ratio
+                anomaly_score = comp.anomaly_score
+                color_score = comp.color_score
+                layout_score = comp.layout_score
+                visual_inconsistencies = comp.inconsistencies
+
         # 8. Compute Signals
         registered_nafdac_dict = None
         if resolved:
@@ -118,8 +174,11 @@ class VerificationPipeline:
         )
         sig_visual = self.visual_eval.evaluate(
             retrieval_cosine_sim=resolved.confidence if resolved else 0.5,
-            alignment_inlier_ratio=0.5,
-            patch_anomaly_score=0.2,
+            alignment_inlier_ratio=inlier_ratio,
+            patch_anomaly_score=anomaly_score,
+            color_score=color_score,
+            layout_score=layout_score,
+            inconsistencies=visual_inconsistencies,
         )
         sig_history = self.history_eval.evaluate(
             is_legacy_match=resolved.is_legacy_version if resolved else False,
@@ -140,7 +199,9 @@ class VerificationPipeline:
         # 9b. VLM Second-Opinion Triage Review (never sole decider)
         if self.enable_vlm_review and verdict in (VerdictState.SUSPICIOUS, VerdictState.CANNOT_VERIFY):
             try:
-                vlm_review = await self.vlm_reviewer.review_packaging_async(rectified_pack)
+                vlm_review = await self.vlm_reviewer.review_packaging_async(
+                    rectified_pack, reference_image=ref_img
+                )
                 if vlm_review and vlm_review.discrepancies:
                     reasons.extend(vlm_review.discrepancies)
             except Exception:

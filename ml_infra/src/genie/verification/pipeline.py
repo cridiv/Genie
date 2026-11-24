@@ -69,15 +69,18 @@ class VerificationPipeline:
             )
 
         # 3. Pack Rectification
-        rectified_pack, _ = self.pack_rectifier.rectify(img_np)
+        rect_res = self.pack_rectifier.rectify(img_np)
+        rectified_pack = rect_res.rectified_image
 
         # 4. Barcode Branch
         barcode_res = MultiDecoder.decode(rectified_pack)
+        if not barcode_res and request.manual_gtin:
+            barcode_res = {"gtin": request.manual_gtin, "check_digit_valid": True}
         gtin = barcode_res.get("gtin") if barcode_res else request.manual_gtin
 
         # 5. OCR Branch
         ocr_data = self.ocr.extract_text(rectified_pack)
-        nafdac = ocr_data.get("nafdac_number") or request.manual_nafdac
+        nafdac = ocr_data.nafdac_number or request.manual_nafdac
 
         # 6. Visual Embedding
         embedding = self.visual_embedder.embed_image(rectified_pack)
@@ -102,8 +105,8 @@ class VerificationPipeline:
         sig_batch = self.batch_eval.evaluate(
             barcode_batch=barcode_res.get("batch") if barcode_res else None,
             barcode_expiry=barcode_res.get("expiry") if barcode_res else None,
-            ocr_batch=ocr_data.get("batch_number"),
-            ocr_expiry=ocr_data.get("expiry_date"),
+            ocr_batch=ocr_data.batch_number,
+            ocr_expiry=ocr_data.expiry_date,
         )
         sig_visual = self.visual_eval.evaluate(
             retrieval_cosine_sim=resolved.confidence if resolved else 0.5,

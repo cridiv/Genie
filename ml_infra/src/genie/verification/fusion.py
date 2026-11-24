@@ -22,7 +22,7 @@ class CalibratedFusionEngine:
         self,
         genuine_threshold: Optional[float] = None,
         suspicious_threshold: Optional[float] = None,
-        platt_scale: float = 4.0,
+        platt_scale: float = 6.0,
         platt_bias: float = -2.0,
     ):
         self.override_genuine = genuine_threshold

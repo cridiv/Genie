@@ -118,6 +118,8 @@ class GS1PayloadParser:
             "production_date": prod_date,
             "prefix_code": prefix_code,
             "prefix_origin": prefix_name,
+            "gs1_prefix_country": prefix_name,
+            "check_digit_valid": gtin_valid,
             "raw_ais": data,
             "checks": {
                 "gtin_checkdigit": gtin_valid,

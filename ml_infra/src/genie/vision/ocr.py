@@ -40,10 +40,10 @@ class PackagingOCR:
     # Comprehensive Nigerian NAFDAC Registration Number Patterns
     NAFDAC_PATTERNS = [
         re.compile(
-            r"(?:NAFDAC\s*(?:REG(?:ISTRATION)?(?:\.|\s*NO)?|NRN|N\.R\.N\.?)[:\s.-]*)(\b[A-B0-9]{2}\s*[-–—]\s*[0-9]{4,6}[A-Z]?\b)",
+            r"(?:NAFDAC(?:\s*REG(?:ISTRATION)?(?:\.|\s*NO)?)?|NRN|N\.R\.N\.?)[:\s.-]*(\b[A-B0-9]{2}\s*[-–—]\s*[0-9]{4,6}[A-Z]?\b)",
             re.IGNORECASE,
         ),
-        re.compile(r"\b([A-B]\d\s*[-–—]\s*\d{4,6})\b", re.IGNORECASE),
+        re.compile(r"\b([A-B]\d\s*[-–—]\s*\d{4,6}[A-Z]?)\b", re.IGNORECASE),
         re.compile(r"\b(\d{2}\s*[-–—]\s*\d{4,6}[A-Z]?)\b"),
     ]
 
@@ -164,6 +164,19 @@ class PackagingOCR:
         closed = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, kernel)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         return clahe.apply(closed)
+
+    def enhance_dot_matrix(self, gray: np.ndarray) -> np.ndarray:
+        return self.enhance_dot_matrix_inkjet(gray)
+
+    def parse_nafdac_number(self, text: str) -> Optional[str]:
+        return self._parse_nafdac_number(text)
+
+    def parse_batch_and_expiry(self, text: str) -> dict:
+        return {
+            "batch_number": self._parse_batch_code(text),
+            "expiry_date": self._parse_expiry_date(text),
+            "mfg_date": self._parse_mfg_date(text),
+        }
 
     @classmethod
     def cross_check_batch_and_expiry(

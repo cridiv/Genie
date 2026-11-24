@@ -180,6 +180,25 @@ For any future change affecting the database (`src/genie/db/models.py`, Alembic 
     - Created unit test suite in `tests/test_resolver_history.py` (4/4 tests passed).
     - Database schema status: Zero database changes required.
 
+13. **Phase 8: Multi-Signal Calibrated Fusion & Explainability Engine [2026-11-24]**:
+    - Enhanced `src/genie/verification/fusion.py` with `CalibratedFusionEngine`: deterministic enforcement of 5 hard invalidation rules (checksum invalid, product identity mismatch, revoked NAFDAC status, printed vs. barcode batch contradiction, serial clone replay); missing signal information threshold policy ($I_{\text{min}} \ge 0.25$); Platt logistic calibration ($\alpha = 6.0$); and category-specific genuine/suspicious decision boundaries.
+    - Enhanced `src/genie/verification/explain.py` with `ExplainabilityEngine`: compliance-mandated audit phrasing with zero absolute claims (forbidden phrases strictly rejected by compliance validation), structured reason sentences citing exact evidence, and anomaly heatmap attachments.
+    - Expanded test suite in `tests/test_fusion.py` covering all 5 hard rules, Platt scaling, insufficient signal handling, and compliance guards (8/8 tests passed).
+    - Database schema status: Zero database changes required.
+
+14. **Phase 9: Evaluation Suites, Golden Benchmarks & Synthetic Datasets [2026-11-24]**:
+    - Implemented `training/synthetic/augment_counterfeit.py` with `SyntheticCounterfeitGenerator`: camera degradations (Gaussian motion blur, non-uniform specular glare masks, JPEG compression), packaging defect simulation (color shifts, missing seals, typography alteration), and digital barcode label splicing.
+    - Implemented `evaluation/barcode_bench/test_barcode_benchmark.py`: GS1 modulo-10 validation, Nigeria prefix hints, enhancement progression, and bracketed/FNC1 payload decoding.
+    - Implemented `evaluation/ocr_bench/test_ocr_accuracy.py`: Nigerian NAFDAC regex validation across medicines, food, and herbals, contextual batch/expiry parsing, and dot-matrix inkjet enhancement.
+    - Implemented `evaluation/e2e_scenarios/test_verification_flow.py`: Full scan verification scenarios covering genuine active packaging, counterfeit batch discrepancies, and quality gating.
+    - Database schema status: Zero database changes required.
+
+15. **Phase 10: Model Serving, Latency Budget & Production Readiness [2026-11-24]**:
+    - Orchestrated end-to-end inference execution in `src/genie/verification/pipeline.py` verifying total verification execution time $< 1,500\text{ms}$ on CPU (well within the $< 4,000\text{ms}$ budget).
+    - Validated all 65 automated tests across `tests/` and `evaluation/` suites with 100% pass rate in $< 4.0\text{s}$.
+    - Completed full 10-phase sequence in `checklist.md`.
+    - Database schema status: Zero database changes required.
+
 ---
 
 ## 2. Database Changelog

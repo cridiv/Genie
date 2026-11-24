@@ -50,3 +50,12 @@ def enhance_barcode_crop(image: np.ndarray) -> List[np.ndarray]:
         variants.append(upscaled_thresh)
 
     return variants
+
+
+class BarcodeEnhancer:
+    """Class wrapper for barcode enhancement algorithms."""
+
+    @staticmethod
+    def generate_enhanced_variants(image: np.ndarray) -> List[np.ndarray]:
+        return enhance_barcode_crop(image)
+

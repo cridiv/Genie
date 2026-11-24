@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     CONFIGS_DIR: Path = Path("./configs")
     GREENBOOK_DB_PATH: Path = Path("./data/greenbook/greenbook.db")
 
+    # GENIE AI Product Intelligence & Verification Service Bridge
+    GENIE_AI_URL: Optional[str] = None
+    GENIE_AI_TIMEOUT_SECONDS: float = 5.0
+
     @property
     def is_production(self) -> bool:
         return self.ENV.lower() == "production"

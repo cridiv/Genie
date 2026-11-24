@@ -172,7 +172,11 @@ class VerificationPipeline:
             barcode_res,
             resolved_product_gtins=resolved.gtin_list if resolved else None,
         )
-        sig_nafdac = self.nafdac_eval.evaluate(nafdac, registered_nafdac_dict)
+        sig_nafdac = self.nafdac_eval.evaluate(
+            nafdac,
+            registered_nafdac_dict,
+            registry_checked=(resolved is not None) or self.ocr.greenbook.db_path.is_file(),
+        )
         sig_batch = self.batch_eval.evaluate(
             barcode_batch=barcode_res.get("batch") if barcode_res else None,
             barcode_expiry=barcode_res.get("expiry") if barcode_res else None,

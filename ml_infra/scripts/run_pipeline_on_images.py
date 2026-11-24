@@ -79,7 +79,7 @@ async def main():
             except QualityGateError as qe:
                 pipeline_out = {
                     "verdict": "REJECTED_BY_QUALITY_GATE",
-                    "error": qe.message,
+                    "error": str(qe),
                     "details": qe.details,
                 }
 

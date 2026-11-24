@@ -40,7 +40,7 @@ class PackagingOCR:
     # Comprehensive Nigerian NAFDAC Registration Number Patterns
     NAFDAC_PATTERNS = [
         re.compile(
-            r"(?:NAFDAC(?:\s*REG(?:ISTRATION)?(?:\.|\s*NO)?)?|NRN|N\.R\.N\.?)[:\s.-]*(\b[A-Z0-9]{2}\s*[-–—]\s*[0-9]{4,6}[A-Z]?\b)",
+            r"(?:NAFDAC(?:\s*REG(?:ISTRATION)?(?:\.|\s*NO)?)?|NRN|N\.R\.N\.?)[:\s.-]*(\b[A-Z0-9]{2}\s*[-–—]?\s*[0-9]{4,6}[A-Z]?\b)",
             re.IGNORECASE,
         ),
         re.compile(r"\b([A-Z]\d\s*[-–—]\s*\d{4,6}[A-Z]?)\b", re.IGNORECASE),
@@ -256,11 +256,12 @@ class PackagingOCR:
         except Exception:
             pass
 
-        # 2. RapidOCR ONNX Runtime fallback
+        # 2. RapidOCR ONNX Runtime fallback (cached singleton)
         try:
             from rapidocr_onnxruntime import RapidOCR
-            rapid = RapidOCR()
-            res, _ = rapid(image_np)
+            if not hasattr(self, "_rapid_ocr") or self._rapid_ocr is None:
+                self._rapid_ocr = RapidOCR()
+            res, _ = self._rapid_ocr(image_np)
             if res:
                 for item in res:
                     if len(item) >= 2 and item[1]:

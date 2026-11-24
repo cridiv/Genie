@@ -139,8 +139,16 @@ class VLMReviewer:
             "top_p": 0.95,
         }
 
-    def _parse_response(self, raw_text: str) -> VLMReviewResult:
+    def _parse_response(self, raw_text: Optional[str]) -> VLMReviewResult:
         """Parses model JSON output, stripping any markdown wrappers."""
+        if not raw_text:
+            return VLMReviewResult(
+                score=0.5,
+                confidence=0.2,
+                is_consistent=True,
+                triage_verdict="Cannot verify",
+                reasons=["VLM returned empty response content."],
+            )
         clean_text = raw_text.strip()
         # Remove markdown code fences if present
         clean_text = re.sub(r"^```(?:json)?\s*", "", clean_text)
@@ -208,7 +216,8 @@ class VLMReviewer:
                 resp.raise_for_status()
                 res_json = resp.json()
 
-            raw_content = res_json["choices"][0]["message"]["content"]
+            msg = res_json["choices"][0]["message"]
+            raw_content = msg.get("content") or msg.get("reasoning_content") or ""
             return self._parse_response(raw_content)
 
         except Exception as e:

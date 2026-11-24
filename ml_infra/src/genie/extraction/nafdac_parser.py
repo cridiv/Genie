@@ -15,7 +15,12 @@ _DASH_WS_RE = re.compile(r"\s*[-–—]\s*")
 
 def normalize_nafdac_number(raw: object) -> str:
     text = html.unescape(str(raw or "")).strip().upper()
-    return _DASH_WS_RE.sub("-", text)
+    text = _DASH_WS_RE.sub("-", text)
+    # Normalize hyphenless NAFDAC codes like A44724 -> A4-4724
+    m = re.match(r"^([A-Z]\d)(\d{4,6}[A-Z]?)$", text)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}"
+    return text
 
 
 class GreenbookRegistry:

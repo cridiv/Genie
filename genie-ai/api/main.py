@@ -9,12 +9,17 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from discovery.models import DiscoverySeed
 from orchestrator import GenieOrchestrator, OrchestratedVerificationResponse
+from verification.image_scan import (
+    ImageVerificationResponse,
+    infer_mime_type,
+    verify_image_bytes,
+)
 from verification.schemas import ScanInput
 
 
@@ -63,6 +68,31 @@ def create_app(orchestrator: Optional[GenieOrchestrator] = None) -> FastAPI:
         auto_discover: bool = Query(default=True, description="Enqueue async discovery if product needs enrichment"),
     ) -> OrchestratedVerificationResponse:
         return orch.verify_scan(scan, auto_discover=auto_discover)
+
+    @app.post("/v1/verify/image", response_model=ImageVerificationResponse)
+    async def post_verify_image(
+        file: UploadFile = File(..., description="JPEG, PNG, or WebP photo of a medicine pack"),
+        compare_visual: bool = Query(
+            default=True,
+            description="Compare photo against approved reference packaging using the Vision LLM",
+        ),
+        auto_discover: bool = Query(
+            default=True,
+            description="Enqueue async discovery if product needs enrichment",
+        ),
+    ) -> ImageVerificationResponse:
+        try:
+            mime_type = infer_mime_type(file.filename, file.content_type)
+            image_bytes = await file.read()
+            return verify_image_bytes(
+                image_bytes,
+                mime_type,
+                orchestrator=orch,
+                compare_visual=compare_visual,
+                auto_discover=auto_discover,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/v1/products")
     def get_products() -> List[Dict[str, Any]]:

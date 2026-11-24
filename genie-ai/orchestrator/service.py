@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from discovery.models import DiscoverySeed
+from intelligence.synthesizer import compute_reference_level
 from registry.greenbook import GreenbookStore, default_db_path
 from registry.trusted_sources import TrustedSourceStore, default_genie_db_path
 from verification.engine import (
@@ -172,7 +173,7 @@ class GenieOrchestrator:
                     "manufacturer": d.get("manufacturer"),
                     "registration_status": d.get("registration_status"),
                     "dossier_status": d.get("dossier_status", "staging"),
-                    "reference_level": d.get("reference_level", "C"),
+                    "reference_level": compute_reference_level(d.get("packaging_versions") or []),
                     "packaging_versions_count": len(d.get("packaging_versions") or []),
                 }
             )

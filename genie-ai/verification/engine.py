@@ -93,8 +93,13 @@ def _clean_digits(raw: Optional[str]) -> str:
     return re.sub(r"\D", "", str(raw or ""))
 
 
-def _tokens(text: Optional[str]) -> List[str]:
-    return [t.lower() for t in re.findall(r"[A-Za-z0-9]+", str(text or "")) if len(t) >= 3]
+def _brand_tokens(text: Optional[str]) -> List[str]:
+    stop = {"mg", "mcg", "ml", "tablet", "tablets", "capsule", "capsules", "caplet", "caplets", "syrup", "suspension", "oral", "pack"}
+    return [
+        t.lower()
+        for t in re.findall(r"[A-Za-z]+", str(text or ""))
+        if len(t) >= 3 and t.lower() not in stop
+    ]
 
 
 def _resolve_product(
@@ -131,7 +136,7 @@ def _resolve_product(
     hint = (scan.product_name_hint or "").strip()
     if hint:
         hint_low = hint.lower()
-        hint_tokens = set(_tokens(hint))
+        hint_tokens = set(_brand_tokens(hint))
         best_match: Optional[Dict[str, Any]] = None
         best_overlap = 0
         for d in dossiers:
@@ -141,7 +146,7 @@ def _resolve_product(
             brand_low = brand.lower()
             if hint_low == brand_low or hint_low in brand_low or brand_low in hint_low:
                 return d, False
-            overlap = len(hint_tokens & set(_tokens(brand)))
+            overlap = len(hint_tokens & set(_brand_tokens(brand)))
             if overlap > best_overlap:
                 best_overlap = overlap
                 best_match = d
@@ -155,9 +160,12 @@ def _resolve_product(
             if rows:
                 return _dossier_from_greenbook_row(rows[0]), True
         if hint:
-            rows = greenbook.search(hint, limit=1)
-            if rows:
-                return _dossier_from_greenbook_row(rows[0]), True
+            hint_brand = set(_brand_tokens(hint))
+            rows = greenbook.search(hint, limit=3)
+            for row in rows:
+                row_brand = set(_brand_tokens(row.get("product_name")))
+                if not hint_brand or (hint_brand & row_brand):
+                    return _dossier_from_greenbook_row(row), True
 
     return None, True
 

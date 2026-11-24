@@ -217,6 +217,34 @@ For any future change affecting the database (`src/genie/db/models.py`, Alembic 
     - Full test suite passed across all 72 tests in 3.13s.
     - Database schema status: Zero database changes required.
 
+18. **Packaging Intelligence Inference Test on Real Image (`images/s9g8qx7q77.jpeg`) [2026-11-24]**:
+    - Executed live multimodal extraction using `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` via NVIDIA NIM endpoint `https://integrate.api.nvidia.com/v1/chat/completions`.
+    - Image evaluated: `images/s9g8qx7q77.jpeg` (anti-malarial pharmaceutical blister & packaging box).
+    - Extracted structured telemetry saved to [`images/extraction_result.json`](images/extraction_result.json):
+      - **Product Identity:** `IBUMARTEM (Artemether 80 mg + Lumefantrine 480 mg Tablet)`
+      - **Active Ingredients:** `Artemether`, `Lumefantrine`
+      - **Manufacturer:** `IBU PHARMA NIGERIA LTD., Ikenne, Ogun State, Nigeria`
+      - **NAFDAC Registration Number:** `B4-6458`
+      - **Mobile Authentication Scheme (MAS):** Sproxil shortcode `1393` detected (`08039012030 TEXT CODE TO 1393`, `www.1393.co`, PIN `028730023401610`)
+      - **Visible Discrepancies & Anomalies Detected:**
+        1. French text truncated on left pack (`luméfantrine 48` missing `0 mg`).
+        2. Script mixing of English word `malaria` inside Arabic phrase (`وقف malaria بسرعة`).
+        3. Pack quantity difference (`10 x 1 x 6 Tablets` vs `1 x 6 Tablets`).
+      - **Quality & Authenticity Assessment:** Overall confidence `0.95`, lighting/clarity `Good`, scratch-off anti-counterfeiting verification sticker identified.
+    - Database schema status: Zero database changes required.
+
+19. **Reference Pack Comparison & Counterfeit Detection Subsystem [2026-11-24]**:
+    - Implemented [`src/genie/vision/pack_compare.py`](src/genie/vision/pack_compare.py) with `PackComparator` and `PackComparisonResult`:
+      - **Geometric Alignment:** Aligns consumer scans to canonical reference packs via ORB + RANSAC homography (`GeometricMatcher`).
+      - **Color Fidelity:** Evaluates lighting-normalized CIELAB chromaticity $\Delta E_{ab}$ and 2D $(a^*, b^*)$ chromaticity histogram correlation to detect counterfeit ink/pigment shifts while tolerating ambient lighting changes.
+      - **Critical Element Positioning & Layout:** Verifies expected locations of critical landmarks (`semantic_regions` such as logos, NAFDAC badges, barcodes, and security seals) via template correlation & pixel shift measurement, plus $4\times 4$ spatial grid SSIM and Canny edge-map IoU.
+      - **Patch Anomaly & Print Forensics:** Integrates `PatchCoreAnomalyDetector` difference heatmaps and edge sharpness ratios.
+    - Implemented [`src/genie/vision/reference_index.py`](src/genie/vision/reference_index.py) with `ReferencePackIndexer` to register genuine reference pack images into SQL (`ReferenceImage`), `ImageStorage`, and `VectorStore` with SHA-256, 64-bit dHash, and auto-extracted salient anchor regions.
+    - Integrated `PackComparator` and `ReferenceImage` loading into [`src/genie/verification/pipeline.py`](src/genie/verification/pipeline.py) and [`src/genie/verification/signals/visual_signal.py`](src/genie/verification/signals/visual_signal.py), passing reference images to `VLMReviewer` for dual-image second-opinion triage.
+    - Added [`tests/test_pack_compare.py`](tests/test_pack_compare.py) covering genuine lighting variations, color-shifted counterfeits, shifted/missing critical elements, and end-to-end `ReferencePackIndexer` + `VerificationPipeline` verification.
+    - Full test suite passed: **76/76 tests passed** across `tests/` and `evaluation/`.
+    - Database schema status: Zero database changes required (`ReferenceImage` already includes `storage_path` and `semantic_regions`).
+
 ---
 
 ## 2. Database Changelog

@@ -1,0 +1,108 @@
+"""Thin FastAPI entrypoint exposing GENIE AI verification, products, and async discovery jobs.
+
+Run locally:
+  cd /Users/Cridiv/Documents/Genie/genie-ai
+  PYTHONPATH=. .venv/bin/uvicorn api.main:app --reload --port 8000
+"""
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from typing import Any, Dict, List, Optional
+
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from discovery.models import DiscoverySeed
+from orchestrator import GenieOrchestrator, OrchestratedVerificationResponse
+from verification.schemas import ScanInput
+
+
+class DiscoveryJobRequest(BaseModel):
+    product_name: Optional[str] = None
+    nafdac_number: Optional[str] = None
+    manufacturer: Optional[str] = None
+    gtin: Optional[str] = None
+
+
+def create_app(orchestrator: Optional[GenieOrchestrator] = None) -> FastAPI:
+    """Create the GENIE AI FastAPI application wired to a `GenieOrchestrator`."""
+    owns_orchestrator = orchestrator is None
+    orch = orchestrator or GenieOrchestrator()
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        try:
+            yield
+        finally:
+            if owns_orchestrator:
+                orch.shutdown(wait=False)
+
+    app = FastAPI(
+        title="GENIE AI — Product Intelligence & Verification API",
+        version="0.1.0",
+        description="Multi-signal pharmaceutical counterfeit verification with coverage-based graceful degradation and async product discovery.",
+        lifespan=lifespan,
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.state.orchestrator = orch
+
+    @app.get("/v1/health")
+    def get_health() -> Dict[str, Any]:
+        return orch.health()
+
+    @app.post("/v1/verify", response_model=OrchestratedVerificationResponse)
+    def post_verify(
+        scan: ScanInput,
+        auto_discover: bool = Query(default=True, description="Enqueue async discovery if product needs enrichment"),
+    ) -> OrchestratedVerificationResponse:
+        return orch.verify_scan(scan, auto_discover=auto_discover)
+
+    @app.get("/v1/products")
+    def get_products() -> List[Dict[str, Any]]:
+        return orch.list_products()
+
+    @app.get("/v1/products/{slug}")
+    def get_product_detail(slug: str) -> Dict[str, Any]:
+        data = orch.get_product(slug)
+        if data is None:
+            raise HTTPException(status_code=404, detail=f"Product dossier {slug!r} not found")
+        return data
+
+    @app.post("/v1/discovery/jobs")
+    def post_discovery_job(req: DiscoveryJobRequest) -> Dict[str, Any]:
+        try:
+            seed = DiscoverySeed(
+                product_name=req.product_name,
+                nafdac_number=req.nafdac_number,
+                manufacturer=req.manufacturer,
+                gtin=req.gtin,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return orch.trigger_discovery(seed)
+
+    @app.get("/v1/jobs")
+    def get_jobs(
+        limit: int = Query(default=20, ge=1, le=100),
+        status: Optional[str] = Query(default=None),
+    ) -> List[Dict[str, Any]]:
+        return orch.list_jobs(limit=limit, status=status)
+
+    @app.get("/v1/jobs/{job_id}")
+    def get_job_detail(job_id: str) -> Dict[str, Any]:
+        job = orch.get_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"Discovery job {job_id!r} not found")
+        return job
+
+    return app
+
+
+app = create_app()

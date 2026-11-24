@@ -61,11 +61,29 @@ def parse_pack_date(raw: Optional[str], *, end_of_month: bool = False) -> Option
             day = calendar.monthrange(y, mo)[1] if end_of_month else 1
             return date(y, mo, day)
 
+    # DD/MM/YYYY or DD-MM-YYYY
+    m = re.fullmatch(r"(\d{1,2})[-/](\d{1,2})[-/](\d{4})", text)
+    if m:
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        try:
+            return date(y, mo, d)
+        except ValueError:
+            return None
+
     # MM/YYYY or MM-YYYY
     m = re.fullmatch(r"(\d{1,2})[-/](\d{4})", text)
     if m:
         mo, y = int(m.group(1)), int(m.group(2))
         if 1 <= mo <= 12:
+            day = calendar.monthrange(y, mo)[1] if end_of_month else 1
+            return date(y, mo, day)
+
+    # MM/YY or MM-YY (common on medicine blisters, e.g. "06/27")
+    m = re.fullmatch(r"(\d{1,2})[-/](\d{2})", text)
+    if m:
+        mo, yy = int(m.group(1)), int(m.group(2))
+        if 1 <= mo <= 12:
+            y = 2000 + yy
             day = calendar.monthrange(y, mo)[1] if end_of_month else 1
             return date(y, mo, day)
 

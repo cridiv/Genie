@@ -126,6 +126,7 @@ def _db_record_payload(dossier: CandidateProductDossier) -> Dict:
         "recall_alerts": dossier.recall_alerts,
         "version_notes": dossier.version_notes,
         "claims": [c.model_dump() for c in dossier.claims],
+        "dossier_status": dossier.dossier_status,
         "reference_level": dossier.reference_level,
         "packaging_versions": [v.model_dump() for v in dossier.packaging_versions],
     }
@@ -204,7 +205,15 @@ def _print_summary(
     print(f"  Version Notes  : {dossier.version_notes}")
     print(f"  Ref. Level     : Level {dossier.reference_level} (approved images only)")
 
-    print(f"\n[4] Verbatim Quote Audit Preview: {quote_audit['matched']}/{quote_audit['total']} matched")
+    gate = dossier.stats.get("evidence_gate") or {}
+    print(
+        f"\n[4] Deterministic Evidence Gate: status={dossier.dossier_status} | "
+        f"quotes={quote_audit['matched']}/{quote_audit['total']} | "
+        f"quarantined={len(gate.get('quarantined_items') or [])} | "
+        f"conflicts={len(gate.get('tier1_conflicts') or [])}"
+    )
+    for reason in gate.get("blocking_reasons") or []:
+        print(f"    * gate_note: {reason}")
     for miss in quote_audit["unmatched"][:5]:
         print(
             f"    ! UNMATCHED [{miss['field_name']}] value={miss['value']!r} "

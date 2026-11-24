@@ -767,7 +767,7 @@ def synthesize_dossier(
     ref_level = compute_reference_level(packaging_versions)
 
     elapsed = round(time.monotonic() - t0, 3)
-    return CandidateProductDossier(
+    dossier = CandidateProductDossier(
         seed=bundle.seed.to_dict(),
         enriched_seed=bundle.enriched_seed.to_dict(),
         brand_name=extracted.brand_name,
@@ -810,3 +810,10 @@ def synthesize_dossier(
             "greenbook_matches_used": len(bundle.greenbook_matches),
         },
     )
+
+    from validation.evidence import validate_dossier_evidence  # noqa: PLC0415
+
+    validated_dossier, gate_report = validate_dossier_evidence(bundle, dossier, sanitize=True)
+    validated_dossier.stats["evidence_gate"] = gate_report.model_dump()
+    validated_dossier.stats["dossier_status"] = gate_report.dossier_status
+    return validated_dossier

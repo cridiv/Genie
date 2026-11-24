@@ -688,6 +688,17 @@ class TestDossierSynthesis(unittest.TestCase):
                     stage="static",
                     identifiers={"gtins": ["5012345678900"]},
                 ),
+                DiscoveredSource(
+                    url="https://nafdac.gov.ng/alert-42",
+                    canonical_url="https://nafdac.gov.ng/alert-42",
+                    domain="nafdac.gov.ng",
+                    trust_tier=1,
+                    trust_label="regulatory",
+                    angles=["regulatory_alerts"],
+                    title="NAFDAC Alert 42",
+                    content="NAFDAC Public Alert 42: Falsified Augmentin 625mg Batch 562626.",
+                    stage="static",
+                ),
             ],
         )
         dossier_resp = ExtractedDossierResponse(

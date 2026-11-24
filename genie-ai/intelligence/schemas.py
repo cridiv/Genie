@@ -246,6 +246,8 @@ class CandidateProductDossier(BaseModel):
     recall_alerts: List[str] = Field(default_factory=list)
     version_notes: List[str] = Field(default_factory=list)
     claims: List[EvidenceClaim] = Field(default_factory=list)
+    dossier_status: Literal["staging", "approved"] = "staging"
+    evidence_summary: Optional[Dict[str, Any]] = None
     reference_level: Literal["A", "B", "C"] = "C"
     packaging_versions: List[PackagingVersion] = Field(default_factory=list)
     reference_images: List[VerifiedReferenceImage] = Field(default_factory=list)

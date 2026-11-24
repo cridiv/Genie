@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0b0e13;
+  --color-surface: #14191f;
+  --color-card: #1a2129;
+  --color-line: #29323d;
+  --color-fg: #f3f6f9;
+  --color-muted: #8c99a9;
+
+  --color-accent: #c8f65a;
+  --color-accent-ink: #0b0e13;
+
+  --color-ok: #3ed598;
+  --color-warn: #ffc24b;
+  --color-bad: #ff6b6b;
+  --color-info: #7fa8ff;
+
+  --radius-card: 28px;
+  --radius-pill: 9999px;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  overscroll-behavior-y: none;
+}
+
+/* App padding that respects the notch + home indicator. */
+.screen-pad {
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+  padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+}
+
+.nav-safe {
+  padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
+}
+
+@keyframes scanline {
+  0%,
+  100% {
+    top: 16%;
+  }
+  50% {
+    top: 82%;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-scanline {
+  animation: scanline 2.4s ease-in-out infinite;
+}
+
+.animate-rise {
+  animation: rise 0.35s ease-out both;
+}
+
+.animate-ping-slow {
+  animation: pulse-ring 2.2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-scanline,
+  .animate-rise,
+  .animate-ping-slow {
+    animation: none;
+  }
+}

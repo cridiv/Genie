@@ -49,17 +49,17 @@
   - `VerificationVerdict`: `authentic` | `likely_authentic` | `registered_unverified` | `suspicious` | `likely_counterfeit` | `unknown`.
   - `VerificationResult`: `verdict`, `confidence`, `coverage`, `reference_level`, `matched_product`, `matched_version`, `signals[]`, `limitations[]`, `counterfeit_tell_hits[]`.
   - `to_ml_infra_verdict()` mapping helper → `Consistent with genuine` / `Suspicious` / `Cannot verify` (for later alignment with `ml_infra/`).
-- **Signals (`verification/signals/`) with default weights:**
+- **Signals (`verification/signals/`) with default weights (scoring signals sum to `1.00`; `recalls_and_tells` is a `0.00`-weight hard-negative safety gate so clear checks never dilute positive scores):**
 
 | Signal | Source | Weight | Positive when | Hard negative |
 | --- | --- | --- | --- | --- |
-| `nafdac.py` | nafdac_derived | 0.15 | registered, status active/renewal, product + manufacturer match | invented / revoked / belongs to another product → `likely_counterfeit`; expired registration → `suspicious` |
-| `recalls_and_tells.py` | per tell `source_kind` | 0.15 | never (clear = neutral) | batch / tell match → `likely_counterfeit` |
-| `gtin.py` | independent | 0.10 | check digit valid + linked to this product (weak, max strength 0.4) | invalid check digit or GTIN of another product → `likely_counterfeit` |
-| `spec_ocr.py` | nafdac_derived | 0.15 | strength / form / pack / manufacturer match | only confident mismatch (`ocr_confidence ≥ 0.85` and unambiguous) → `suspicious` |
-| `batch_expiry.py` | nafdac_derived | 0.10 | dates plausible vs SmPC shelf life | inverted dates / impossible gap → `suspicious`; expired pack → `suspicious` |
-| `security_features.py` | independent | 0.10 | strong only for `verified_features`; presence alone = weak (max 0.3) | only if feature was in `features_checked` and still absent → `suspicious` ("not observed" ≠ "absent") |
-| `visual.py` | independent | 0.25 | CV match vs current **or historical** approved versions (`MockCVAdapter` for tests/demo); A = full weight, B = 0.6× | severe anomaly at level A/B → `suspicious` |
+| `visual.py` | independent | **0.40** *(always applicable; A = 0.40, B = 0.30, C = unavailable)* | CV match vs current **or historical** approved versions (`MockCVAdapter` for tests/demo) | severe anomaly at level A/B → `suspicious` |
+| `nafdac.py` | nafdac_derived | **0.20** | registered, status active/renewal, product + manufacturer match | invented / revoked / belongs to another product → `likely_counterfeit`; expired registration → `suspicious` |
+| `spec_ocr.py` | nafdac_derived | **0.15** | strength / form / pack / manufacturer match | only confident mismatch (`ocr_confidence ≥ 0.85` and unambiguous) → `suspicious` |
+| `batch_expiry.py` | nafdac_derived | **0.10** | dates plausible vs SmPC shelf life | inverted dates / impossible gap → `suspicious`; expired pack → `suspicious` |
+| `gtin.py` | independent | **0.08** *(`not_applicable` if dossier has no GTINs)* | check digit valid + linked to this product (weak, max strength 0.4) | invalid check digit or GTIN of another product → `likely_counterfeit` |
+| `security_features.py` | independent | **0.07** *(`not_applicable` if dossier has none)* | strong only for `verified_features`; presence alone = weak (max 0.3) | only if feature was in `features_checked` and still absent → `suspicious` ("not observed" ≠ "absent") |
+| `recalls_and_tells.py` | per tell `source_kind` | **0.00 (Gate)** | never (clear = neutral; does not penalize score) | batch / tell match → `likely_counterfeit` at any coverage |
 
 - **Registration status mapping (`nafdac.py`):** `Active` → active; `Ongoing Renewal` / `Renewal in progress` → active-with-note (never a negative); `Expired` → `suspicious` (could be older legal stock); `Revoked` / `Cancelled` / `Suspended` → `likely_counterfeit`; unknown string → neutral + limitation.
 - **Core scorer (`verification/engine.py`):**

@@ -14,18 +14,26 @@ from PIL import Image, ImageDraw
 from discovery.models import DiscoveredSource, DiscoveryBundle, DiscoverySeed
 from intelligence import (
     BatchImageVerificationResponse,
+    CounterfeitTell,
     EvidenceClaim,
     ExtractedDossierResponse,
     GeminiProvider,
     LocalImageStorage,
     NvidiaProvider,
+    PackagingVersion,
     RawImageCheck,
+    SecurityFeatureSpec,
+    VerifiedReferenceImage,
+    build_dossier_prompt,
     collect_candidate_image_urls,
     compute_dhash,
+    compute_reference_level,
     download_and_deduplicate_images,
+    extract_smpc_key_sections,
     get_default_provider,
     hamming_distance,
     parse_allowed_pack_counts,
+    parse_shelf_life_months,
     synthesize_dossier,
     verify_images,
 )
@@ -580,6 +588,146 @@ class TestDossierSynthesis(unittest.TestCase):
         with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "gem-test"}, clear=True):
             provider = get_default_provider()
             self.assertIsInstance(provider, GeminiProvider)
+
+    def test_smpc_key_sections_survive_truncation_and_parse_shelf_life(self) -> None:
+        long_middle = "Clinical pharmacology details. " * 400  # > 12,000 chars
+        smpc_text = (
+            "1. NAME OF THE MEDICINAL PRODUCT\nCoartem 20 mg/120 mg tablets\n"
+            "3. PHARMACEUTICAL FORM\nLight yellow, round tablet with NC debossed on one side and CG on the other.\n"
+            + long_middle
+            + "\n6.3 Shelf life\n24 months.\n"
+            + "6.4 Special precautions for storage\nDo not store above 30°C. Store in the original package.\n"
+            + "6.5 Nature and contents of container\nPVC/PE/PVDC aluminium blister packs of 18 or 24 tablets.\n"
+            + "7. MARKETING AUTHORISATION HOLDER\nNovartis Nigeria Limited"
+        )
+        extracted = extract_smpc_key_sections(smpc_text)
+        self.assertIn("24 months", extracted)
+        self.assertIn("Do not store above 30°C", extracted)
+        self.assertIn("NC debossed", extracted)
+        self.assertEqual(parse_shelf_life_months(extracted), 24)
+        self.assertEqual(parse_shelf_life_months("6.3 Shelf life\n3 years"), 36)
+
+        bundle = DiscoveryBundle(
+            seed=DiscoverySeed(product_name="Coartem 20/120 Tablets"),
+            enriched_seed=DiscoverySeed(product_name="Coartem 20/120 Tablets"),
+            sources=[
+                DiscoveredSource(
+                    url="https://admin.greenbook.nafdac.gov.ng/smpc/coartem.pdf",
+                    canonical_url="https://admin.greenbook.nafdac.gov.ng/smpc/coartem.pdf",
+                    domain="admin.greenbook.nafdac.gov.ng",
+                    trust_tier=1,
+                    trust_label="regulatory",
+                    angles=["greenbook_smpc"],
+                    title="Coartem SmPC",
+                    content=smpc_text,
+                    stage="pdf",
+                    is_smpc_pdf=True,
+                )
+            ],
+        )
+        prompt = build_dossier_prompt(bundle, max_chars_per_source=1000)
+        self.assertIn("smpc_extracted_sections:", prompt)
+        self.assertIn("24 months", prompt)
+        self.assertIn("Do not store above 30°C", prompt)
+
+    def test_compute_reference_level_counts_only_approved_images(self) -> None:
+        def _img(view: str, status: str) -> VerifiedReferenceImage:
+            return VerifiedReferenceImage(
+                image_id="abc123",
+                storage_path="images/abc.jpg",
+                source_url="https://healthplusnigeria.com/a.jpg",
+                source_page_url="https://healthplusnigeria.com/p/a",
+                source_trust_tier=2,
+                sha256="a" * 64,
+                dhash="0" * 16,
+                width=500,
+                height=500,
+                mime_type="image/jpeg",
+                view_type=view,
+                status=status,
+            )
+
+        # Staging images never count -> Level C
+        v_staging = [PackagingVersion(edition_id="e1", images=[_img("front_box", "staging"), _img("back_box", "staging")])]
+        self.assertEqual(compute_reference_level(v_staging), "C")
+
+        # 1 approved view -> Level B
+        v_one = [PackagingVersion(edition_id="e1", images=[_img("front_box", "approved"), _img("front_box", "approved")])]
+        self.assertEqual(compute_reference_level(v_one), "B")
+
+        # >= 2 distinct approved views -> Level A
+        v_multi = [PackagingVersion(edition_id="e1", images=[_img("front_box", "approved"), _img("back_box", "approved")])]
+        self.assertEqual(compute_reference_level(v_multi), "A")
+
+    def test_synthesize_dossier_merges_gtins_shelf_life_and_normalizes_tell_source_kind(self) -> None:
+        bundle = DiscoveryBundle(
+            seed=DiscoverySeed(product_name="Augmentin 625 mg"),
+            enriched_seed=DiscoverySeed(product_name="Augmentin 625 mg", nafdac_number="04-1928"),
+            sources=[
+                DiscoveredSource(
+                    url="https://admin.greenbook.nafdac.gov.ng/smpc/aug.pdf",
+                    canonical_url="https://admin.greenbook.nafdac.gov.ng/smpc/aug.pdf",
+                    domain="admin.greenbook.nafdac.gov.ng",
+                    trust_tier=1,
+                    trust_label="regulatory",
+                    angles=["greenbook_smpc"],
+                    title="Augmentin SmPC",
+                    content="Header\n" + ("x" * 5000) + "\n6.3 Shelf life\n3 years\n6.4 Special precautions for storage\nStore below 25°C.",
+                    stage="pdf",
+                    is_smpc_pdf=True,
+                ),
+                DiscoveredSource(
+                    url="https://healthplusnigeria.com/products/augmentin-625",
+                    canonical_url="https://healthplusnigeria.com/products/augmentin-625",
+                    domain="healthplusnigeria.com",
+                    trust_tier=2,
+                    trust_label="vetted_pharma",
+                    angles=["pharma_reference"],
+                    title="Augmentin 625mg",
+                    content="Augmentin 625mg",
+                    stage="static",
+                    identifiers={"gtins": ["5012345678900"]},
+                ),
+            ],
+        )
+        dossier_resp = ExtractedDossierResponse(
+            brand_name="Augmentin 625 mg",
+            nafdac_number="04-1928",
+            storage_statement="Store below 25°C.",
+            expected_security_features=[
+                SecurityFeatureSpec(
+                    feature_type="tablet_debossing",
+                    description="Debossed with AC on one side",
+                    required=True,
+                    verifiable=False,
+                )
+            ],
+            known_counterfeit_tells=[
+                CounterfeitTell(
+                    tell_type="compromised_batch",
+                    summary="Falsified Augmentin 625mg Batch 562626",
+                    affected_batches=["562626"],
+                    source_url="https://nafdac.gov.ng/alert-42",
+                    source_kind="independent",  # should be normalized to nafdac_derived!
+                ),
+                CounterfeitTell(
+                    tell_type="spelling_error",
+                    summary="WHO alert noted misspelled manufacturer line",
+                    source_url="https://who.int/news/item/alert-99",
+                    source_kind="independent",
+                ),
+            ],
+        )
+        provider = MockLLMProvider(dossier_resp, BatchImageVerificationResponse())
+        dossier = synthesize_dossier(bundle, provider=provider, verify_visuals=False)
+
+        self.assertEqual(dossier.gtins, ["5012345678900"])
+        self.assertEqual(dossier.shelf_life_months, 36)  # parsed deterministically from SmPC fallback!
+        self.assertEqual(dossier.storage_statement, "Store below 25°C.")
+        self.assertEqual(dossier.reference_level, "C")
+        self.assertEqual(len(dossier.expected_security_features), 1)
+        self.assertEqual(dossier.known_counterfeit_tells[0].source_kind, "nafdac_derived")
+        self.assertEqual(dossier.known_counterfeit_tells[1].source_kind, "independent")
 
     def test_collect_candidate_images_drops_counterfeit_news_and_alert_sources(self) -> None:
         bundle = DiscoveryBundle(

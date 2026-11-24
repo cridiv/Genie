@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
 
+from intelligence.synthesizer import compute_reference_level
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -50,6 +52,7 @@ def promote_reference_image(
     if matched_img is None:
         raise KeyError(f"Image id {image_id!r} not found in {path}")
 
+    data["reference_level"] = compute_reference_level(data.get("packaging_versions") or [])
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     return matched_img
 

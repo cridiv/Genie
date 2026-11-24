@@ -27,6 +27,7 @@ from PIL import Image, UnidentifiedImageError
 
 from intelligence.images import _safe_http_download, compute_dhash, hamming_distance
 from intelligence.storage import LocalImageStorage
+from intelligence.synthesizer import compute_reference_level
 from registry import GreenbookStore, TrustedSourceStore
 from scraper.extract import extract_report
 from scraper.search import search_images, search_report
@@ -301,6 +302,7 @@ def ingest_product_references(
             errors.append(f"{page_url or image_url or local_path_str}: {exc}")
 
     data["packaging_versions"] = versions
+    data["reference_level"] = compute_reference_level(versions)
     product_json_path.write_text(
         json.dumps(data, indent=2, ensure_ascii=False),
         encoding="utf-8",

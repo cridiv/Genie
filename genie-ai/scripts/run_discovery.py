@@ -115,12 +115,18 @@ def _db_record_payload(dossier: CandidateProductDossier) -> Dict:
         "manufacturer": dossier.manufacturer,
         "nafdac_number": dossier.nafdac_number,
         "registration_status": dossier.registration_status,
+        "gtins": dossier.gtins,
+        "shelf_life_months": dossier.shelf_life_months,
+        "storage_statement": dossier.storage_statement,
         "packaging_description": dossier.packaging_description,
         "color_scheme": dossier.color_scheme,
         "distinctive_features": dossier.distinctive_features,
+        "expected_security_features": [f.model_dump() for f in dossier.expected_security_features],
+        "known_counterfeit_tells": [t.model_dump() for t in dossier.known_counterfeit_tells],
         "recall_alerts": dossier.recall_alerts,
         "version_notes": dossier.version_notes,
         "claims": [c.model_dump() for c in dossier.claims],
+        "reference_level": dossier.reference_level,
         "packaging_versions": [v.model_dump() for v in dossier.packaging_versions],
     }
 
@@ -187,11 +193,16 @@ def _print_summary(
     print(f"  Pack Size      : {dossier.pack_size}")
     print(f"  Manufacturer   : {dossier.manufacturer}")
     print(f"  NAFDAC Number  : {dossier.nafdac_number} (Status: {dossier.registration_status})")
+    print(f"  GTINs          : {dossier.gtins}")
+    print(f"  Shelf Life     : {dossier.shelf_life_months} months | Storage: {dossier.storage_statement}")
     print(f"  Packaging Desc : {dossier.packaging_description}")
     print(f"  Color Scheme   : {dossier.color_scheme}")
     print(f"  Features       : {dossier.distinctive_features}")
+    print(f"  Sec. Features  : {len(dossier.expected_security_features)} extracted")
+    print(f"  Fake Tells     : {len(dossier.known_counterfeit_tells)} extracted")
     print(f"  Recall Alerts  : {dossier.recall_alerts}")
     print(f"  Version Notes  : {dossier.version_notes}")
+    print(f"  Ref. Level     : Level {dossier.reference_level} (approved images only)")
 
     print(f"\n[4] Verbatim Quote Audit Preview: {quote_audit['matched']}/{quote_audit['total']} matched")
     for miss in quote_audit["unmatched"][:5]:

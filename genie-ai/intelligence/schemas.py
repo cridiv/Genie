@@ -24,6 +24,82 @@ class EvidenceClaim(BaseModel):
         return str(v)
 
 
+class SecurityFeatureSpec(BaseModel):
+    feature_type: Literal[
+        "scratch_pin",
+        "hologram",
+        "tamper_seal",
+        "tablet_debossing",
+        "qr_code",
+        "braille",
+        "other",
+    ] = "other"
+    description: str
+    required: bool = False
+    verifiable: bool = False
+    source_url: Optional[str] = None
+    verbatim_quote: Optional[str] = None
+
+    @field_validator("feature_type", mode="before")
+    @classmethod
+    def _normalize_feature_type(cls, v: Any) -> str:
+        allowed = {
+            "scratch_pin",
+            "hologram",
+            "tamper_seal",
+            "tablet_debossing",
+            "qr_code",
+            "braille",
+            "other",
+        }
+        val = str(v or "other").strip().lower()
+        return val if val in allowed else "other"
+
+
+class CounterfeitTell(BaseModel):
+    tell_type: Literal[
+        "compromised_batch",
+        "packaging_defect",
+        "spelling_error",
+        "wrong_color_or_foil",
+        "missing_security_feature",
+        "fake_manufacturer_info",
+        "other",
+    ] = "other"
+    summary: str
+    affected_batches: List[str] = Field(default_factory=list)
+    fake_indicator: Optional[str] = None
+    genuine_indicator: Optional[str] = None
+    alert_ref: Optional[str] = None
+    source_url: Optional[str] = None
+    verbatim_quote: Optional[str] = None
+    source_kind: Literal["nafdac_derived", "independent"] = "independent"
+
+    @field_validator("tell_type", mode="before")
+    @classmethod
+    def _normalize_tell_type(cls, v: Any) -> str:
+        allowed = {
+            "compromised_batch",
+            "packaging_defect",
+            "spelling_error",
+            "wrong_color_or_foil",
+            "missing_security_feature",
+            "fake_manufacturer_info",
+            "other",
+        }
+        val = str(v or "other").strip().lower()
+        return val if val in allowed else "other"
+
+    @field_validator("affected_batches", mode="before")
+    @classmethod
+    def _coerce_batches(cls, v: Any) -> List[str]:
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v.strip()] if v.strip() else []
+        return [str(x).strip() for x in v if x is not None and str(x).strip()]
+
+
 class RawImageCheck(BaseModel):
     candidate_index: int
     is_product_packaging: bool
@@ -73,15 +149,21 @@ class ExtractedDossierResponse(BaseModel):
     manufacturer: Optional[str] = None
     nafdac_number: Optional[str] = None
     registration_status: Optional[str] = None
+    gtins: List[str] = Field(default_factory=list)
+    shelf_life_months: Optional[int] = None
+    storage_statement: Optional[str] = None
     packaging_description: Optional[str] = None
     color_scheme: List[str] = Field(default_factory=list)
     distinctive_features: List[str] = Field(default_factory=list)
+    expected_security_features: List[SecurityFeatureSpec] = Field(default_factory=list)
+    known_counterfeit_tells: List[CounterfeitTell] = Field(default_factory=list)
     recall_alerts: List[str] = Field(default_factory=list)
     version_notes: List[str] = Field(default_factory=list)
     claims: List[EvidenceClaim] = Field(default_factory=list)
 
     @field_validator(
         "active_ingredients",
+        "gtins",
         "color_scheme",
         "distinctive_features",
         "recall_alerts",
@@ -95,6 +177,13 @@ class ExtractedDossierResponse(BaseModel):
         if isinstance(v, str):
             return [v] if v.strip() else []
         return [str(x) for x in v if x is not None]
+
+    @field_validator("expected_security_features", "known_counterfeit_tells", mode="before")
+    @classmethod
+    def _coerce_obj_lists(cls, v: Any) -> List[Any]:
+        if v is None:
+            return []
+        return list(v) if isinstance(v, list) else []
 
 
 class VerifiedReferenceImage(BaseModel):
@@ -146,15 +235,27 @@ class CandidateProductDossier(BaseModel):
     manufacturer: Optional[str] = None
     nafdac_number: Optional[str] = None
     registration_status: Optional[str] = None
+    gtins: List[str] = Field(default_factory=list)
+    shelf_life_months: Optional[int] = None
+    storage_statement: Optional[str] = None
     packaging_description: Optional[str] = None
     color_scheme: List[str] = Field(default_factory=list)
     distinctive_features: List[str] = Field(default_factory=list)
+    expected_security_features: List[SecurityFeatureSpec] = Field(default_factory=list)
+    known_counterfeit_tells: List[CounterfeitTell] = Field(default_factory=list)
     recall_alerts: List[str] = Field(default_factory=list)
     version_notes: List[str] = Field(default_factory=list)
     claims: List[EvidenceClaim] = Field(default_factory=list)
+    reference_level: Literal["A", "B", "C"] = "C"
+    packaging_versions: List[PackagingVersion] = Field(default_factory=list)
+    reference_images: List[VerifiedReferenceImage] = Field(default_factory=list)
+    rejected_images: List[Dict] = Field(default_factory=list)
+    model_used: str
+    stats: Dict = Field(default_factory=dict)
 
     @field_validator(
         "active_ingredients",
+        "gtins",
         "color_scheme",
         "distinctive_features",
         "recall_alerts",
@@ -168,8 +269,3 @@ class CandidateProductDossier(BaseModel):
         if isinstance(v, str):
             return [v] if v.strip() else []
         return [str(x) for x in v if x is not None]
-    packaging_versions: List[PackagingVersion] = Field(default_factory=list)
-    reference_images: List[VerifiedReferenceImage] = Field(default_factory=list)
-    rejected_images: List[Dict] = Field(default_factory=list)
-    model_used: str
-    stats: Dict = Field(default_factory=dict)

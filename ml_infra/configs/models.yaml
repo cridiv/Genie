@@ -52,3 +52,21 @@ models:
     version: "ppocr_v5"
     use_angle_cls: true
     lang: "en"
+    vlm_engine: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    nvidia_ocrnet: "ocdrnet"
+
+  vlm_review:
+    primary_model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    backup_model: "google/gemma-3-27b-it"
+    endpoint: "https://integrate.api.nvidia.com/v1/chat/completions"
+    role: "second_opinion_triage"
+    max_tokens: 4096
+    reasoning_budget: 16384
+    temperature: 0.2
+    top_p: 0.95
+
+  nvidia_vision_endpoints:
+    retrieval: "nv-dinov2"
+    zero_shot_detection: "nv-grounding-dino"
+    ocr: "ocdrnet"
+    image_text_matching: "nv-clip"

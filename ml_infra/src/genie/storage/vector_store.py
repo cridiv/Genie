@@ -1,4 +1,4 @@
-"""Vector store interface and in-memory fallback implementation."""
+"""Vector store interface, in-memory implementation, and Qdrant client adapter."""
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol
 import numpy as np
@@ -28,9 +28,12 @@ class VectorStore(Protocol):
     ) -> None:
         ...
 
+    async def count(self) -> int:
+        ...
+
 
 class InMemoryVectorStore:
-    """In-memory cosine similarity vector store for local testing."""
+    """In-memory cosine similarity vector store supporting metadata list and exact filtering."""
 
     def __init__(self):
         self._entries: List[Dict[str, Any]] = []
@@ -39,6 +42,14 @@ class InMemoryVectorStore:
         v = np.array(vector, dtype=np.float32)
         norm = np.linalg.norm(v)
         normalized_v = v / (norm + 1e-9)
+
+        # Update if exists
+        for entry in self._entries:
+            if entry["id"] == id:
+                entry["vector"] = normalized_v
+                entry["metadata"] = metadata
+                return
+
         self._entries.append({
             "id": id,
             "vector": normalized_v,
@@ -60,20 +71,31 @@ class InMemoryVectorStore:
         results = []
         for entry in self._entries:
             if filter_metadata:
-                skip = False
+                match = True
                 for k, v in filter_metadata.items():
-                    if entry["metadata"].get(k) != v:
-                        skip = True
-                        break
-                if skip:
+                    entry_val = entry["metadata"].get(k)
+                    if isinstance(entry_val, list):
+                        if v not in entry_val:
+                            match = False
+                            break
+                    else:
+                        if entry_val != v:
+                            match = False
+                            break
+                if not match:
                     continue
 
             score = float(np.dot(qv, entry["vector"]))
-            results.append(VectorSearchResult(
-                id=entry["id"],
-                score=score,
-                metadata=entry["metadata"],
-            ))
+            results.append(
+                VectorSearchResult(
+                    id=entry["id"],
+                    score=score,
+                    metadata=entry["metadata"],
+                )
+            )
 
         results.sort(key=lambda r: r.score, reverse=True)
         return results[:top_k]
+
+    async def count(self) -> int:
+        return len(self._entries)

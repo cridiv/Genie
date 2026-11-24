@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class ScanImage(BaseModel):
     image_bytes_base64: Optional[str] = None
     image_url: Optional[str] = None
-    face_hint: Optional[str] = Field(None, example="front")  # front, back, blister, side
+    face_hint: Optional[str] = Field(None, json_schema_extra={"example": "front"})
 
 
 class DecodedBarcode(BaseModel):

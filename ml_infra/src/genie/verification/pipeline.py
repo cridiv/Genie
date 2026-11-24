@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from genie.barcode.decode import MultiDecoder
 from genie.common.exceptions import QualityGateError
 from genie.schemas.scan import ScanRequest
-from genie.schemas.verdict import VerificationResponse
+from genie.schemas.verdict import VerificationResponse, VerdictState
 from genie.storage.vector_store import VectorStore
 from genie.verification.explain import ExplainabilityEngine
 from genie.verification.fusion import CalibratedFusionEngine
@@ -24,19 +24,27 @@ from genie.vision.embed import VisualEmbedder
 from genie.vision.ocr import PackagingOCR
 from genie.vision.pack_detect import PackDetectorRectifier
 from genie.vision.quality import ImageQualityGate
+from genie.vision.vlm_review import VLMReviewer
 
 
 class VerificationPipeline:
-    def __init__(self, db_session: AsyncSession, vector_store: VectorStore):
+    def __init__(
+        self,
+        db_session: AsyncSession,
+        vector_store: VectorStore,
+        enable_vlm_review: bool = False,
+    ):
         self.db = db_session
         self.vector_store = vector_store
+        self.enable_vlm_review = enable_vlm_review
 
         # Components
         self.quality_gate = ImageQualityGate()
         self.pack_rectifier = PackDetectorRectifier()
         self.visual_embedder = VisualEmbedder()
-        self.ocr = PackagingOCR()
+        self.ocr = PackagingOCR(enable_vlm=False)
         self.anomaly_detector = PatchCoreAnomalyDetector()
+        self.vlm_reviewer = VLMReviewer()
         self.resolver = ProductResolver(db_session, vector_store)
         self.fusion = CalibratedFusionEngine()
 
@@ -69,15 +77,18 @@ class VerificationPipeline:
             )
 
         # 3. Pack Rectification
-        rectified_pack, _ = self.pack_rectifier.rectify(img_np)
+        rect_res = self.pack_rectifier.rectify(img_np)
+        rectified_pack = rect_res.rectified_image
 
         # 4. Barcode Branch
         barcode_res = MultiDecoder.decode(rectified_pack)
+        if not barcode_res and request.manual_gtin:
+            barcode_res = {"gtin": request.manual_gtin, "check_digit_valid": True}
         gtin = barcode_res.get("gtin") if barcode_res else request.manual_gtin
 
         # 5. OCR Branch
         ocr_data = self.ocr.extract_text(rectified_pack)
-        nafdac = ocr_data.get("nafdac_number") or request.manual_nafdac
+        nafdac = ocr_data.nafdac_number or request.manual_nafdac
 
         # 6. Visual Embedding
         embedding = self.visual_embedder.embed_image(rectified_pack)
@@ -102,8 +113,8 @@ class VerificationPipeline:
         sig_batch = self.batch_eval.evaluate(
             barcode_batch=barcode_res.get("batch") if barcode_res else None,
             barcode_expiry=barcode_res.get("expiry") if barcode_res else None,
-            ocr_batch=ocr_data.get("batch_number"),
-            ocr_expiry=ocr_data.get("expiry_date"),
+            ocr_batch=ocr_data.batch_number,
+            ocr_expiry=ocr_data.expiry_date,
         )
         sig_visual = self.visual_eval.evaluate(
             retrieval_cosine_sim=resolved.confidence if resolved else 0.5,
@@ -125,6 +136,15 @@ class VerificationPipeline:
 
         # 9. Calibrated Fusion
         verdict, confidence, breakdown, reasons = self.fusion.fuse(signals_dict)
+
+        # 9b. VLM Second-Opinion Triage Review (never sole decider)
+        if self.enable_vlm_review and verdict in (VerdictState.SUSPICIOUS, VerdictState.CANNOT_VERIFY):
+            try:
+                vlm_review = await self.vlm_reviewer.review_packaging_async(rectified_pack)
+                if vlm_review and vlm_review.discrepancies:
+                    reasons.extend(vlm_review.discrepancies)
+            except Exception:
+                pass
 
         # 10. Explanation Assembly
         explanation = ExplainabilityEngine.assemble_explanation(

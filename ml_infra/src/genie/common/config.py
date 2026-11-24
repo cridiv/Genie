@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     GOOGLE_MAPS_API_KEY: Optional[str] = None
 
+    # NVIDIA NIM Cloud (VLM Discrepancy Review, OCR, Vision)
+    NVIDIA_API_KEY: Optional[str] = None
+    NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    NVIDIA_VLM_MODEL: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+
     # Reference paths
     CONFIGS_DIR: Path = Path("./configs")
     GREENBOOK_DB_PATH: Path = Path("./data/greenbook/greenbook.db")

@@ -167,6 +167,19 @@ For any future change affecting the database (`src/genie/db/models.py`, Alembic 
     - Created unit test suite in `tests/test_alignment_forensics.py` verifying planar alignment, affine perturbation tolerance, divergent layout rejection, Delta-E color shift flagging, edge sharpness discrimination, and regulatory seal verification (7/7 tests passed).
     - Database schema status: Zero database changes required.
 
+11. **Phase 6: Patch-Level Visual Anomaly Detection (One-Class Learning) [2026-11-24]**:
+    - Implemented `training/anomaly/build_patchcore.py` with dense multi-channel spatial-color patch extraction and greedy minimax facility location (k-center) coreset subsampling to compress memory banks by 90% while preserving spatial coverage.
+    - Implemented `src/genie/vision/anomaly.py` with `PatchCoreAnomalyDetector`: nearest-neighbor Euclidean distance in patch embedding space, top-k patch anomaly aggregation, spatial upsampling, and Jet false-color explainability heatmap overlay generation ($<80\text{ms}$).
+    - Created unit test suite in `tests/test_anomaly.py` verifying patch token normalization, minimax coreset compression, genuine baseline matching, and localized counterfeit defect detection (4/4 tests passed).
+    - Database schema status: Zero database changes required.
+
+12. **Phase 7: Historical Packaging Traversal & Candidate Resolution [2026-11-24]**:
+    - Implemented `src/genie/verification/resolver.py` with `ProductResolver`: hierarchical multi-signal voting (Priority 1: GTIN exact list membership; Priority 2: NAFDAC registration normalization; Priority 3: DINOv2 cosine similarity vector retrieval with $\ge 0.75$ threshold).
+    - Implemented SCD Type 2 historical packaging version traversal in `traverse_historical_versions()`: checking `status == 'superseded'` against `shelf_life_months * 30` transition windows to prevent false counterfeit flags on authentic packaging revisions.
+    - Updated `src/genie/verification/signals/history_signal.py` with `HistorySignalEvaluator` confirming legal transition window validity.
+    - Created unit test suite in `tests/test_resolver_history.py` (4/4 tests passed).
+    - Database schema status: Zero database changes required.
+
 ---
 
 ## 2. Database Changelog

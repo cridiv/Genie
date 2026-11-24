@@ -1,9 +1,9 @@
 """Pydantic v2 schemas for Step 3 Dossier Synthesis & Visual Verification."""
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class EvidenceClaim(BaseModel):
@@ -11,6 +11,17 @@ class EvidenceClaim(BaseModel):
     value: str
     source_url: str
     verbatim_quote: str
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _coerce_value_to_str(cls, v: Any) -> str:
+        if v is None:
+            return ""
+        if isinstance(v, list):
+            return "; ".join(str(item) for item in v if item is not None)
+        if isinstance(v, dict):
+            return str(v)
+        return str(v)
 
 
 class RawImageCheck(BaseModel):
@@ -38,6 +49,15 @@ class RawImageCheck(BaseModel):
     quality_ok: bool = True
     rejection_reason: Optional[str] = None
 
+    @field_validator("visible_cues", "visible_text_snippets", mode="before")
+    @classmethod
+    def _coerce_str_list(cls, v: Any) -> List[str]:
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v] if v.strip() else []
+        return [str(x) for x in v if x is not None]
+
 
 class BatchImageVerificationResponse(BaseModel):
     results: List[RawImageCheck] = Field(default_factory=list)
@@ -59,6 +79,22 @@ class ExtractedDossierResponse(BaseModel):
     recall_alerts: List[str] = Field(default_factory=list)
     version_notes: List[str] = Field(default_factory=list)
     claims: List[EvidenceClaim] = Field(default_factory=list)
+
+    @field_validator(
+        "active_ingredients",
+        "color_scheme",
+        "distinctive_features",
+        "recall_alerts",
+        "version_notes",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_list_fields(cls, v: Any) -> List[str]:
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v] if v.strip() else []
+        return [str(x) for x in v if x is not None]
 
 
 class VerifiedReferenceImage(BaseModel):
@@ -116,6 +152,22 @@ class CandidateProductDossier(BaseModel):
     recall_alerts: List[str] = Field(default_factory=list)
     version_notes: List[str] = Field(default_factory=list)
     claims: List[EvidenceClaim] = Field(default_factory=list)
+
+    @field_validator(
+        "active_ingredients",
+        "color_scheme",
+        "distinctive_features",
+        "recall_alerts",
+        "version_notes",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_list_fields(cls, v: Any) -> List[str]:
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v] if v.strip() else []
+        return [str(x) for x in v if x is not None]
     packaging_versions: List[PackagingVersion] = Field(default_factory=list)
     reference_images: List[VerifiedReferenceImage] = Field(default_factory=list)
     rejected_images: List[Dict] = Field(default_factory=list)

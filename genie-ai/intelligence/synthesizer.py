@@ -341,14 +341,27 @@ def verify_images(
     trusted_only_images: bool = True,
     downloader: Optional[Callable[[str], Tuple[bytes, str]]] = None,
     progress_cb: Optional[Callable[[str], None]] = None,
+    funnel_out: Optional[Dict[str, int]] = None,
 ) -> Tuple[List[VerifiedReferenceImage], List[Dict], Dict[str, str]]:
     """Download, deduplicate, visually verify via multimodal LLM, and persist valid packaging images."""
+    funnel: Dict[str, int] = {}
     candidates = collect_candidate_image_urls(
         bundle,
         trusted_store=trusted_store,
         trusted_only=trusted_only_images,
+        funnel_out=funnel,
     )
     if not candidates:
+        funnel.update({"downloaded": 0, "passed_vision": 0, "saved": 0})
+        if funnel_out is not None:
+            funnel_out.update(funnel)
+        if progress_cb:
+            progress_cb(
+                f"[3b] Image funnel: raw={funnel.get('raw_total', 0)} "
+                f"(pages={funnel.get('raw_from_pages', 0)}, search={funnel.get('raw_from_search', 0)}) "
+                f"-> dropped_alert={funnel.get('dropped_disqualified', 0)}, "
+                f"dropped_untrusted={funnel.get('dropped_untrusted', 0)} -> trusted=0 -> saved=0"
+            )
         return [], [], {}
 
     if progress_cb:
@@ -365,6 +378,15 @@ def verify_images(
             f"({len(kept)} unique kept, {len(rejected)} pre-filtered)"
         )
     if not kept:
+        funnel.update({"downloaded": 0, "passed_vision": 0, "saved": 0})
+        if funnel_out is not None:
+            funnel_out.update(funnel)
+        if progress_cb:
+            progress_cb(
+                f"[3b] Image funnel: raw={funnel.get('raw_total', 0)} "
+                f"(pages={funnel.get('raw_from_pages', 0)}, search={funnel.get('raw_from_search', 0)}) "
+                f"-> trusted={funnel.get('after_trusted', 0)} -> downloaded=0 -> saved=0"
+            )
         return [], rejected, {}
 
     prompt = build_image_verify_prompt(bundle, kept)
@@ -482,6 +504,23 @@ def verify_images(
             )
         )
 
+    funnel.update(
+        {
+            "downloaded": len(kept),
+            "passed_vision": len(surviving),
+            "saved": len(verified),
+        }
+    )
+    if funnel_out is not None:
+        funnel_out.update(funnel)
+    if progress_cb:
+        progress_cb(
+            f"[3c] Image funnel: raw={funnel.get('raw_total', 0)} "
+            f"(pages={funnel.get('raw_from_pages', 0)}, search={funnel.get('raw_from_search', 0)}) "
+            f"-> trusted={funnel.get('after_trusted', 0)} -> downloaded={len(kept)} "
+            f"-> passed_vision={len(surviving)} -> saved={len(verified)}"
+        )
+
     return verified, rejected, edition_summaries
 
 
@@ -568,6 +607,7 @@ def synthesize_dossier(
     verified_images: List[VerifiedReferenceImage] = []
     rejected_images: List[Dict] = []
     packaging_versions: List[PackagingVersion] = []
+    image_funnel: Dict[str, int] = {}
     if verify_visuals:
         verified_images, rejected_images, edition_summaries = verify_images(
             bundle,
@@ -579,6 +619,7 @@ def synthesize_dossier(
             trusted_only_images=trusted_only_images,
             downloader=image_downloader,
             progress_cb=progress_cb,
+            funnel_out=image_funnel,
         )
         packaging_versions = group_packaging_versions(verified_images, edition_summaries)
 
@@ -611,6 +652,7 @@ def synthesize_dossier(
             "packaging_versions_count": len(packaging_versions),
             "reference_images_count": len(verified_images),
             "rejected_images_count": len(rejected_images),
+            "image_funnel": image_funnel,
             "sources_used": len(bundle.sources),
             "greenbook_matches_used": len(bundle.greenbook_matches),
         },

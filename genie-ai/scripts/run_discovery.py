@@ -204,6 +204,18 @@ def _print_summary(
         f"\n[5] Packaging Versions: {len(dossier.packaging_versions)} edition(s), "
         f"{len(dossier.reference_images)} verified image(s), {len(dossier.rejected_images)} rejected"
     )
+    funnel = dossier.stats.get("image_funnel") or {}
+    if funnel:
+        print(
+            f"  Funnel: raw={funnel.get('raw_total', 0)} "
+            f"(pages={funnel.get('raw_from_pages', 0)}, search={funnel.get('raw_from_search', 0)}) "
+            f"-> dropped_alert={funnel.get('dropped_disqualified', 0)}, "
+            f"dropped_untrusted={funnel.get('dropped_untrusted', 0)} "
+            f"-> trusted={funnel.get('after_trusted', 0)} "
+            f"-> downloaded={funnel.get('downloaded', 0)} "
+            f"-> vision_ok={funnel.get('passed_vision', 0)} "
+            f"-> saved={funnel.get('saved', 0)}"
+        )
     for ver in dossier.packaging_versions:
         role = "PRIMARY" if ver.is_primary else "ALTERNATE"
         reg = " [NAFDAC/MAS markers]" if ver.has_local_regulatory_markers else ""

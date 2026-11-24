@@ -14,7 +14,13 @@ from scraper.extract.structured import _is_junk_image
 from scraper.search import SearchBackendError, search_images, search_report
 
 from .models import DiscoveredSource, DiscoveryBundle, DiscoverySeed, SearchQuery
-from .planner import build_image_query, build_queries, build_trusted_image_queries, enrich_seed_from_greenbook
+from .planner import (
+    build_image_query,
+    build_queries,
+    build_trusted_image_queries,
+    build_trusted_pharmacy_web_queries,
+    enrich_seed_from_greenbook,
+)
 from .trust import canonicalize_url, classify_url, extract_domain, is_disqualified_image_source, rank_and_select
 
 _RELEVANCE_STOPWORDS = frozenset(
@@ -298,6 +304,18 @@ def discover(
             smpc_url = candidate_smpc
 
     queries = build_queries(enriched_seed, has_smpc_pdf=bool(smpc_url))
+    trusted_domains: List[str] = []
+    if trusted_store is not None:
+        trusted_domains = trusted_store.get_verified_image_domains(
+            country=enriched_seed.country or "NG",
+            manufacturer_hint=enriched_seed.manufacturer,
+        )
+        queries.extend(
+            build_trusted_pharmacy_web_queries(
+                enriched_seed,
+                trusted_domains=trusted_domains,
+            )
+        )
 
     # 2. Parallel multi-angle web search (+ optional direct packaging image search)
     effective_search = search_fn or search_report
@@ -314,10 +332,6 @@ def discover(
     if run_img_search:
         gb_top = gb_matches[0] if gb_matches else None
         if trusted_store is not None:
-            trusted_domains = trusted_store.get_verified_image_domains(
-                country=enriched_seed.country or "NG",
-                manufacturer_hint=enriched_seed.manufacturer,
-            )
             img_queries = build_trusted_image_queries(
                 enriched_seed,
                 trusted_domains=trusted_domains,
@@ -374,7 +388,7 @@ def discover(
                         seen_img_urls.add(u)
                         image_candidates.append(item)
 
-    # 3. Rank & select web candidates (+ official SmPC PDF if available)
+    # 3. Rank & select web candidates (+ official SmPC PDF + guaranteed trusted pharmacy product pages)
     web_budget = max(1, max_urls - 1) if smpc_url and max_urls > 1 else max_urls
     selected = rank_and_select(
         all_hits,
@@ -382,6 +396,21 @@ def discover(
         max_urls=web_budget,
         max_per_domain=2,
     )
+
+    if trusted_store is not None:
+        trusted_hits = [h for h in all_hits if h.get("angle") == "trusted_pharmacy"]
+        if trusted_hits:
+            trusted_selected = rank_and_select(
+                trusted_hits,
+                manufacturer_hint=enriched_seed.manufacturer,
+                max_urls=4,
+                max_per_domain=1,
+            )
+            existing_canons = {c.canonical_url for c in selected}
+            for tc in trusted_selected:
+                if tc.canonical_url not in existing_canons:
+                    selected.append(tc)
+                    existing_canons.add(tc.canonical_url)
 
     meta_by_canon: Dict[str, Dict] = {}
     fetch_urls: List[str] = []

@@ -66,6 +66,7 @@ def collect_candidate_image_urls(
     *,
     trusted_store=None,
     trusted_only: bool = True,
+    funnel_out: Optional[Dict[str, int]] = None,
 ) -> List[Dict]:
     """Collect and rank candidate image URLs from scraped sources and direct image search.
 
@@ -75,11 +76,17 @@ def collect_candidate_image_urls(
     """
     ranked: List[tuple[tuple[int, int, int], Dict]] = []
     seq = 0
+    raw_from_pages = 0
+    raw_from_search = 0
+    dropped_disqualified = 0
+    dropped_untrusted = 0
+
     for source in bundle.sources:
         for img in source.images:
             url = str(img.get("url") or "").strip()
             if not url:
                 continue
+            raw_from_pages += 1
             alt = str(img.get("alt") or "")
             if is_disqualified_image_source(
                 url,
@@ -87,6 +94,7 @@ def collect_candidate_image_urls(
                 f"{source.title} {alt}".strip(),
                 angles=source.angles,
             ):
+                dropped_disqualified += 1
                 continue
             trusted_match = (
                 trusted_store.is_verified_image_source(source.url or url)
@@ -94,6 +102,7 @@ def collect_candidate_image_urls(
                 else None
             )
             if trusted_store is not None and trusted_only and trusted_match is None:
+                dropped_untrusted += 1
                 continue
             ext_src = str(img.get("source") or "img")
             sort_key = (source.trust_tier, _SOURCE_PRIORITY.get(ext_src, 4), seq)
@@ -119,9 +128,11 @@ def collect_candidate_image_urls(
         url = str(img.get("url") or "").strip()
         if not url:
             continue
+        raw_from_search += 1
         page_url = str(img.get("source_page_url") or "")
         alt = str(img.get("alt") or img.get("title") or "")
         if is_disqualified_image_source(url, page_url, alt):
+            dropped_disqualified += 1
             continue
         trusted_match = (
             trusted_store.is_verified_image_source(page_url or url)
@@ -129,6 +140,7 @@ def collect_candidate_image_urls(
             else None
         )
         if trusted_store is not None and trusted_only and trusted_match is None:
+            dropped_untrusted += 1
             continue
         ext_src = str(img.get("source") or "image_search")
         tier = int(img.get("source_trust_tier") or 3)
@@ -169,6 +181,19 @@ def collect_candidate_image_urls(
         out.append(item)
         if len(out) >= max_candidates:
             break
+
+    if funnel_out is not None:
+        raw_total = raw_from_pages + raw_from_search
+        funnel_out.update(
+            {
+                "raw_total": raw_total,
+                "raw_from_pages": raw_from_pages,
+                "raw_from_search": raw_from_search,
+                "dropped_disqualified": dropped_disqualified,
+                "dropped_untrusted": dropped_untrusted,
+                "after_trusted": len(out),
+            }
+        )
     return out
 
 

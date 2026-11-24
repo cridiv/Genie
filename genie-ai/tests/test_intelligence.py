@@ -18,15 +18,18 @@ from intelligence import (
     ExtractedDossierResponse,
     GeminiProvider,
     LocalImageStorage,
+    NvidiaProvider,
     RawImageCheck,
     collect_candidate_image_urls,
     compute_dhash,
     download_and_deduplicate_images,
+    get_default_provider,
     hamming_distance,
     parse_allowed_pack_counts,
     synthesize_dossier,
     verify_images,
 )
+from intelligence.llm import _extract_json_object
 
 
 def _make_pattern_image(
@@ -564,6 +567,19 @@ class TestDossierSynthesis(unittest.TestCase):
             self.assertEqual(provider.model_name, "gemini-2.5-pro")
             with self.assertRaises(ValueError):
                 provider.generate_structured("hello", ExtractedDossierResponse)
+
+    def test_nvidia_provider_extracts_json_and_auto_selects_with_env_key(self) -> None:
+        raw = '<think>reasoning here</think>\n```json\n{"brand_name": "Coartem"}\n```'
+        self.assertEqual(_extract_json_object(raw), '{"brand_name": "Coartem"}')
+
+        with mock.patch.dict(os.environ, {"NVIDIA_API_KEY": "nvapi-test"}, clear=True):
+            provider = get_default_provider()
+            self.assertIsInstance(provider, NvidiaProvider)
+            self.assertEqual(provider.model_name, "nvidia/nemotron-3.5-lightning-30b-a3b")
+
+        with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "gem-test"}, clear=True):
+            provider = get_default_provider()
+            self.assertIsInstance(provider, GeminiProvider)
 
     def test_collect_candidate_images_drops_counterfeit_news_and_alert_sources(self) -> None:
         bundle = DiscoveryBundle(

@@ -84,6 +84,10 @@ class TestTrustedSources(unittest.TestCase):
         ]
         queries = build_trusted_image_queries(seed, trusted_domains=domains, max_domains_per_query=5)
         self.assertEqual(len(queries), 2)
+        self.assertTrue(queries[0].startswith("Coartem -dispersible -syrup ("))
+        self.assertNotIn("20/120", queries[0])
+        self.assertNotIn("pack box", queries[0])
+        self.assertNotIn("Novartis", queries[0])
         self.assertIn("site:healthplusnigeria.com", queries[0])
         self.assertIn("site:emzor.com", queries[0])
         self.assertNotIn("site:fidson.com", queries[0])

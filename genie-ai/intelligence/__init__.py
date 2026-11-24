@@ -9,7 +9,15 @@ from .images import (
     hamming_distance,
     is_disqualified_image_source,
 )
-from .llm import DEFAULT_GEMINI_MODEL, GeminiProvider, LLMProvider, get_default_provider
+from .llm import (
+    DEFAULT_GEMINI_MODEL,
+    DEFAULT_NVIDIA_MODEL,
+    DEFAULT_NVIDIA_VISION_MODEL,
+    GeminiProvider,
+    LLMProvider,
+    NvidiaProvider,
+    get_default_provider,
+)
 from .schemas import (
     BatchImageVerificationResponse,
     CandidateProductDossier,
@@ -34,6 +42,8 @@ __all__ = [
     "BatchImageVerificationResponse",
     "CandidateProductDossier",
     "DEFAULT_GEMINI_MODEL",
+    "DEFAULT_NVIDIA_MODEL",
+    "DEFAULT_NVIDIA_VISION_MODEL",
     "DownloadedImage",
     "EvidenceClaim",
     "ExtractedDossierResponse",
@@ -41,6 +51,7 @@ __all__ = [
     "ImageStorage",
     "LLMProvider",
     "LocalImageStorage",
+    "NvidiaProvider",
     "PackagingVersion",
     "RawImageCheck",
     "VerifiedReferenceImage",

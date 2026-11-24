@@ -67,14 +67,16 @@ class PackagingOCR:
         re.compile(r"\b(?:MFD|MFG)[:\s.-]*([A-Z]{3,4}\.?\s*[0-9]{4})\b", re.IGNORECASE),
     ]
 
-    def __init__(self, greenbook_db_path: Optional[str] = None):
+    def __init__(self, greenbook_db_path: Optional[str] = None, enable_vlm: bool = False):
         self.greenbook = GreenbookRegistry(db_path=greenbook_db_path)
+        self.enable_vlm = enable_vlm
 
     def extract_text(
         self,
         image_np: np.ndarray,
         barcode_batch: Optional[str] = None,
         barcode_expiry: Optional[str] = None,
+        use_vlm: bool = False,
     ) -> OCRExtractionResult:
         t0 = time.perf_counter()
         lines: List[str] = []
@@ -83,16 +85,23 @@ class PackagingOCR:
         extracted_lines = self._run_ocr_engine(image_np)
         lines.extend(extracted_lines)
 
+        # Optional fallback to NVIDIA VLM OCR if lines are empty and explicitly enabled
+        vlm_data = {}
+        if not lines and (use_vlm or self.enable_vlm):
+            vlm_data = self.extract_with_vlm(image_np)
+            if vlm_data.get("raw_text_lines"):
+                lines.extend(vlm_data["raw_text_lines"])
+
         full_text = " ".join(lines)
         normalized_text = self._normalize_ocr_text(full_text)
 
         # 2. Regulatory NAFDAC Number Parsing
-        nafdac_found = self._parse_nafdac_number(normalized_text)
+        nafdac_found = self._parse_nafdac_number(normalized_text) or vlm_data.get("nafdac_number")
 
         # 3. Batch & Expiry Parsing
-        batch_found = self._parse_batch_code(normalized_text)
-        expiry_found = self._parse_expiry_date(normalized_text)
-        mfg_found = self._parse_mfg_date(normalized_text)
+        batch_found = self._parse_batch_code(normalized_text) or vlm_data.get("batch_number")
+        expiry_found = self._parse_expiry_date(normalized_text) or vlm_data.get("expiry_date")
+        mfg_found = self._parse_mfg_date(normalized_text) or vlm_data.get("mfg_date")
 
         # 4. Local Greenbook Database Lookup (<5ms)
         greenbook_record = None
@@ -177,6 +186,26 @@ class PackagingOCR:
             "expiry_date": self._parse_expiry_date(text),
             "mfg_date": self._parse_mfg_date(text),
         }
+
+    def extract_with_vlm(self, image_np: np.ndarray) -> dict:
+        """Extracts text, NAFDAC number, and batch/expiry using NVIDIA Nemotron VLM."""
+        from genie.common.config import settings
+        if not settings.NVIDIA_API_KEY:
+            return {}
+
+        try:
+            from genie.vision.vlm_review import VLMReviewer
+            reviewer = VLMReviewer()
+            res = reviewer.review_packaging(image_np)
+            return {
+                "nafdac_number": res.detected_nafdac,
+                "batch_number": res.detected_batch,
+                "expiry_date": res.detected_expiry,
+                "mfg_date": None,
+                "raw_text_lines": res.reasons,
+            }
+        except Exception:
+            return {}
 
     @classmethod
     def cross_check_batch_and_expiry(

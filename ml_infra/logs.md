@@ -199,6 +199,24 @@ For any future change affecting the database (`src/genie/db/models.py`, Alembic 
     - Completed full 10-phase sequence in `checklist.md`.
     - Database schema status: Zero database changes required.
 
+16. **Environment & Dependency Synchronization [2026-11-24]**:
+    - Consolidated all critical runtime, vision, database, storage, and testing dependencies into [`requirements.txt`](requirements.txt) with exact version boundaries.
+    - Created template [`.env`](.env) with dummy values for all database URLs, Qdrant host/port/key, S3 credentials, Gemini API key, Google Maps key, and Redis configuration.
+    - Cleaned up non-operational build artifacts (`src/genie_ml_infra.egg-info`).
+    - Synchronized `.venv` using `uv pip install`, installing 70 packages (including `fastapi`, `uvicorn`, `boto3`, `qdrant-client`, `scikit-learn`, `onnxruntime`, `google-genai`).
+    - Verified all 65 automated tests pass with 100% success rate in 5.44s.
+    - Database schema status: Zero database changes required.
+
+17. **NVIDIA Nemotron VLM Integration for Forensic Review & OCR [2026-11-24]**:
+    - Configured `NVIDIA_API_KEY`, `NVIDIA_BASE_URL` (`https://integrate.api.nvidia.com/v1`), and `NVIDIA_VLM_MODEL` (`nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`) in [`.env`](.env) and [`.env.example`](.env.example).
+    - Updated `src/genie/common/config.py` and `configs/models.yaml` with VLM triage parameters, second opinion role, and NVIDIA vision endpoint mappings (`nv-dinov2`, `nv-grounding-dino`, `ocdrnet`, `nv-clip`).
+    - Implemented `src/genie/vision/vlm_review.py` with `VLMReviewer` and `VLMReviewResult`: enforces multimodal dual-image comparison, strict JSON response parsing (`score`, `confidence`, `is_consistent`, `triage_verdict`, `reasons`, `discrepancies`), and architectural guardrail establishing VLM as a second-opinion explainer, never the sole decider.
+    - Enhanced `src/genie/vision/ocr.py` with `extract_with_vlm()`: provides VLM-assisted transcription fallback for NAFDAC numbers, batch codes, and expiry dates.
+    - Integrated VLM triage second-opinion review into `src/genie/verification/pipeline.py`.
+    - Created unit test suite in `tests/test_vlm_review.py` covering payload generation, clean/markdown JSON parsing, mock responses, unconfigured key fallback, and VLM OCR extraction (7/7 tests passed).
+    - Full test suite passed across all 72 tests in 3.13s.
+    - Database schema status: Zero database changes required.
+
 ---
 
 ## 2. Database Changelog

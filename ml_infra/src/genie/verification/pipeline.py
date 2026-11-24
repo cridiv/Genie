@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from genie.barcode.decode import MultiDecoder
 from genie.common.exceptions import QualityGateError
 from genie.schemas.scan import ScanRequest
-from genie.schemas.verdict import VerificationResponse
+from genie.schemas.verdict import VerificationResponse, VerdictState
 from genie.storage.vector_store import VectorStore
 from genie.verification.explain import ExplainabilityEngine
 from genie.verification.fusion import CalibratedFusionEngine
@@ -24,19 +24,27 @@ from genie.vision.embed import VisualEmbedder
 from genie.vision.ocr import PackagingOCR
 from genie.vision.pack_detect import PackDetectorRectifier
 from genie.vision.quality import ImageQualityGate
+from genie.vision.vlm_review import VLMReviewer
 
 
 class VerificationPipeline:
-    def __init__(self, db_session: AsyncSession, vector_store: VectorStore):
+    def __init__(
+        self,
+        db_session: AsyncSession,
+        vector_store: VectorStore,
+        enable_vlm_review: bool = False,
+    ):
         self.db = db_session
         self.vector_store = vector_store
+        self.enable_vlm_review = enable_vlm_review
 
         # Components
         self.quality_gate = ImageQualityGate()
         self.pack_rectifier = PackDetectorRectifier()
         self.visual_embedder = VisualEmbedder()
-        self.ocr = PackagingOCR()
+        self.ocr = PackagingOCR(enable_vlm=False)
         self.anomaly_detector = PatchCoreAnomalyDetector()
+        self.vlm_reviewer = VLMReviewer()
         self.resolver = ProductResolver(db_session, vector_store)
         self.fusion = CalibratedFusionEngine()
 
@@ -128,6 +136,15 @@ class VerificationPipeline:
 
         # 9. Calibrated Fusion
         verdict, confidence, breakdown, reasons = self.fusion.fuse(signals_dict)
+
+        # 9b. VLM Second-Opinion Triage Review (never sole decider)
+        if self.enable_vlm_review and verdict in (VerdictState.SUSPICIOUS, VerdictState.CANNOT_VERIFY):
+            try:
+                vlm_review = await self.vlm_reviewer.review_packaging_async(rectified_pack)
+                if vlm_review and vlm_review.discrepancies:
+                    reasons.extend(vlm_review.discrepancies)
+            except Exception:
+                pass
 
         # 10. Explanation Assembly
         explanation = ExplainabilityEngine.assemble_explanation(

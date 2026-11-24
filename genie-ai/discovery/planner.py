@@ -151,3 +151,29 @@ def build_image_query(
     if "syrup" not in target_context and "suspension" not in target_context:
         exclusions.append("-syrup")
     return f"{base} {' '.join(exclusions)}".strip()
+
+
+def build_trusted_image_queries(
+    seed: DiscoverySeed,
+    *,
+    trusted_domains: List[str],
+    greenbook_match: Optional[Dict] = None,
+    max_domains_per_query: int = 5,
+) -> List[str]:
+    """Build site:-scoped image queries over verified trusted domains, capped at `max_domains_per_query`."""
+    base = build_image_query(seed, greenbook_match=greenbook_match)
+    cleaned: List[str] = []
+    for dom in trusted_domains or []:
+        d = (dom or "").strip().lower().removeprefix("www.")
+        if d and d not in cleaned:
+            cleaned.append(d)
+    if not cleaned:
+        return [base]
+
+    chunk_size = max(1, int(max_domains_per_query))
+    queries: List[str] = []
+    for i in range(0, len(cleaned), chunk_size):
+        chunk = cleaned[i : i + chunk_size]
+        site_clause = " OR ".join(f"site:{d}" for d in chunk)
+        queries.append(f"{base} ({site_clause})")
+    return queries

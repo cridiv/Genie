@@ -5,6 +5,7 @@ import hashlib
 import io
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
@@ -32,6 +33,9 @@ class DownloadedImage:
     sha256: str
     dhash: str
     raw_bytes: bytes
+    captured_from_domain: Optional[str] = None
+    captured_from_type: Optional[str] = None
+    captured_at: Optional[str] = None
 
 
 def compute_dhash(img: Image.Image) -> str:
@@ -59,8 +63,16 @@ def hamming_distance(h1: str, h2: str) -> int:
 def collect_candidate_image_urls(
     bundle: DiscoveryBundle,
     max_candidates: int = 16,
+    *,
+    trusted_store=None,
+    trusted_only: bool = True,
 ) -> List[Dict]:
-    """Collect and rank candidate image URLs from scraped sources and direct image search."""
+    """Collect and rank candidate image URLs from scraped sources and direct image search.
+
+    When `trusted_store` is provided and `trusted_only=True`, only images whose source
+    page (or image URL) belongs to an active `verified` pharmacy or manufacturer in
+    `trusted_sources` are admitted.
+    """
     ranked: List[tuple[tuple[int, int, int], Dict]] = []
     seq = 0
     for source in bundle.sources:
@@ -76,6 +88,13 @@ def collect_candidate_image_urls(
                 angles=source.angles,
             ):
                 continue
+            trusted_match = (
+                trusted_store.is_verified_image_source(source.url or url)
+                if trusted_store is not None
+                else None
+            )
+            if trusted_store is not None and trusted_only and trusted_match is None:
+                continue
             ext_src = str(img.get("source") or "img")
             sort_key = (source.trust_tier, _SOURCE_PRIORITY.get(ext_src, 4), seq)
             seq += 1
@@ -90,6 +109,8 @@ def collect_candidate_image_urls(
                         "alt": alt,
                         "declared_width": img.get("width"),
                         "declared_height": img.get("height"),
+                        "captured_from_domain": trusted_match["domain"] if trusted_match else None,
+                        "captured_from_type": trusted_match["source_type"] if trusted_match else None,
                     },
                 )
             )
@@ -101,6 +122,13 @@ def collect_candidate_image_urls(
         page_url = str(img.get("source_page_url") or "")
         alt = str(img.get("alt") or img.get("title") or "")
         if is_disqualified_image_source(url, page_url, alt):
+            continue
+        trusted_match = (
+            trusted_store.is_verified_image_source(page_url or url)
+            if trusted_store is not None
+            else None
+        )
+        if trusted_store is not None and trusted_only and trusted_match is None:
             continue
         ext_src = str(img.get("source") or "image_search")
         tier = int(img.get("source_trust_tier") or 3)
@@ -117,6 +145,16 @@ def collect_candidate_image_urls(
                     "alt": alt,
                     "declared_width": img.get("width"),
                     "declared_height": img.get("height"),
+                    "captured_from_domain": (
+                        trusted_match["domain"]
+                        if trusted_match
+                        else img.get("captured_from_domain")
+                    ),
+                    "captured_from_type": (
+                        trusted_match["source_type"]
+                        if trusted_match
+                        else img.get("captured_from_type")
+                    ),
                 },
             )
         )
@@ -302,6 +340,9 @@ def download_and_deduplicate_images(
                 sha256=sha256,
                 dhash=dhash,
                 raw_bytes=raw_bytes,
+                captured_from_domain=cand.get("captured_from_domain"),
+                captured_from_type=cand.get("captured_from_type"),
+                captured_at=datetime.now(timezone.utc).isoformat(),
             )
         )
 

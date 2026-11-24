@@ -337,11 +337,17 @@ def verify_images(
     *,
     product_key: Optional[str] = None,
     max_unique: int = 6,
+    trusted_store=None,
+    trusted_only_images: bool = True,
     downloader: Optional[Callable[[str], Tuple[bytes, str]]] = None,
     progress_cb: Optional[Callable[[str], None]] = None,
 ) -> Tuple[List[VerifiedReferenceImage], List[Dict], Dict[str, str]]:
     """Download, deduplicate, visually verify via multimodal LLM, and persist valid packaging images."""
-    candidates = collect_candidate_image_urls(bundle)
+    candidates = collect_candidate_image_urls(
+        bundle,
+        trusted_store=trusted_store,
+        trusted_only=trusted_only_images,
+    )
     if not candidates:
         return [], [], {}
 
@@ -468,6 +474,10 @@ def verify_images(
                 has_local_regulatory_markers=check.has_local_regulatory_markers,
                 visible_cues=list(check.visible_cues),
                 visible_text_snippets=list(check.visible_text_snippets),
+                captured_from_domain=img.captured_from_domain,
+                captured_from_type=img.captured_from_type,
+                captured_at=img.captured_at,
+                market_verified=bool(check.has_local_regulatory_markers),
                 status="staging",
             )
         )
@@ -530,6 +540,8 @@ def synthesize_dossier(
     product_key: Optional[str] = None,
     verify_visuals: bool = True,
     max_unique_images: int = 6,
+    trusted_store=None,
+    trusted_only_images: bool = True,
     image_downloader: Optional[Callable[[str], Tuple[bytes, str]]] = None,
     progress_cb: Optional[Callable[[str], None]] = None,
 ) -> CandidateProductDossier:
@@ -563,6 +575,8 @@ def synthesize_dossier(
             active_storage,
             product_key=product_key,
             max_unique=max_unique_images,
+            trusted_store=trusted_store,
+            trusted_only_images=trusted_only_images,
             downloader=image_downloader,
             progress_cb=progress_cb,
         )

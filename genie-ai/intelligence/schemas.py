@@ -79,6 +79,12 @@ class VerifiedReferenceImage(BaseModel):
     has_local_regulatory_markers: bool = False
     visible_cues: List[str] = Field(default_factory=list)
     visible_text_snippets: List[str] = Field(default_factory=list)
+    captured_from_domain: Optional[str] = None
+    captured_from_type: Optional[str] = None
+    captured_at: Optional[str] = None
+    market_verified: bool = False
+    approved_by: Optional[str] = None
+    approved_at: Optional[str] = None
     status: str = "staging"
 
 

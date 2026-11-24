@@ -14,7 +14,7 @@ from scraper.extract.structured import _is_junk_image
 from scraper.search import SearchBackendError, search_images, search_report
 
 from .models import DiscoveredSource, DiscoveryBundle, DiscoverySeed, SearchQuery
-from .planner import build_image_query, build_queries, enrich_seed_from_greenbook
+from .planner import build_image_query, build_queries, build_trusted_image_queries, enrich_seed_from_greenbook
 from .trust import canonicalize_url, classify_url, extract_domain, is_disqualified_image_source, rank_and_select
 
 _RELEVANCE_STOPWORDS = frozenset(
@@ -156,6 +156,7 @@ def _run_image_search(
     country: Optional[str],
     manufacturer_hint: Optional[str],
     image_search_fn: Callable,
+    trusted_store=None,
 ) -> tuple[List[Dict], Optional[Dict]]:
     if delay_s > 0:
         time.sleep(delay_s)
@@ -190,6 +191,11 @@ def _run_image_search(
             continue
         if is_disqualified_image_source(img_url, page_url, title):
             continue
+        trusted_match = (
+            trusted_store.is_verified_image_source(page_url or img_url)
+            if trusted_store is not None
+            else None
+        )
         seen.add(img_url)
         filtered.append(
             {
@@ -201,6 +207,8 @@ def _run_image_search(
                 "source": str(hit.get("source") or "image_search"),
                 "source_trust_tier": tier,
                 "source_trust_label": label,
+                "captured_from_domain": trusted_match["domain"] if trusted_match else None,
+                "captured_from_type": trusted_match["source_type"] if trusted_match else None,
             }
         )
     return filtered, None
@@ -262,6 +270,7 @@ def discover(
     *,
     greenbook: Optional[GreenbookStore] = None,
     db_path: Optional[Path | str] = None,
+    trusted_store=None,
     max_urls: int = 8,
     max_results_per_query: int = 6,
     max_stage: Optional[str] = None,
@@ -301,7 +310,23 @@ def discover(
     image_candidates: List[Dict] = []
     country = enriched_seed.country.lower() if enriched_seed.country else None
 
-    total_tasks = len(queries) + (1 if run_img_search else 0)
+    img_queries: List[str] = []
+    if run_img_search:
+        gb_top = gb_matches[0] if gb_matches else None
+        if trusted_store is not None:
+            trusted_domains = trusted_store.get_verified_image_domains(
+                country=enriched_seed.country or "NG",
+                manufacturer_hint=enriched_seed.manufacturer,
+            )
+            img_queries = build_trusted_image_queries(
+                enriched_seed,
+                trusted_domains=trusted_domains,
+                greenbook_match=gb_top,
+            )
+        else:
+            img_queries = [build_image_query(enriched_seed, greenbook_match=gb_top)]
+
+    total_tasks = len(queries) + len(img_queries)
     if total_tasks > 0:
         with ThreadPoolExecutor(max_workers=min(workers, total_tasks)) as pool:
             text_futures = [
@@ -315,22 +340,19 @@ def discover(
                 )
                 for idx, q in enumerate(queries)
             ]
-            img_future = (
+            img_futures = [
                 pool.submit(
                     _run_image_search,
-                    build_image_query(
-                        enriched_seed,
-                        greenbook_match=gb_matches[0] if gb_matches else None,
-                    ),
-                    delay_s=len(queries) * stagger,
+                    iq,
+                    delay_s=(len(queries) + idx) * stagger,
                     max_results=max_image_hits,
                     country=country,
                     manufacturer_hint=enriched_seed.manufacturer,
                     image_search_fn=effective_img_search,
+                    trusted_store=trusted_store,
                 )
-                if run_img_search
-                else None
-            )
+                for idx, iq in enumerate(img_queries)
+            ]
 
             for fut in as_completed(text_futures):
                 q_obj, hits, err_entry = fut.result()
@@ -341,10 +363,16 @@ def discover(
                     hit_copy["angle"] = q_obj.angle
                     all_hits.append(hit_copy)
 
-            if img_future is not None:
-                image_candidates, img_err = img_future.result()
+            seen_img_urls: set[str] = set()
+            for img_fut in img_futures:
+                batch_imgs, img_err = img_fut.result()
                 if img_err:
                     search_errors.append(img_err)
+                for item in batch_imgs:
+                    u = item.get("url")
+                    if u and u not in seen_img_urls:
+                        seen_img_urls.add(u)
+                        image_candidates.append(item)
 
     # 3. Rank & select web candidates (+ official SmPC PDF if available)
     web_budget = max(1, max_urls - 1) if smpc_url and max_urls > 1 else max_urls

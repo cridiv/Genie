@@ -19,6 +19,7 @@ from typing import Dict, List
 from discovery import DiscoveryBundle, DiscoverySeed, discover
 from intelligence import CandidateProductDossier, LocalImageStorage, synthesize_dossier
 from intelligence.synthesizer import _format_greenbook_source
+from registry import TrustedSourceStore
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _WS_RE = re.compile(r"\s+")
@@ -210,9 +211,14 @@ def _print_summary(
         print(f"  * {ver.edition_id} [{role}]{reg}{summary}")
         for img in ver.images:
             full_path = storage.resolve(img.storage_path)
+            src_tag = (
+                f" | trusted={img.captured_from_domain} ({img.captured_from_type})"
+                if img.captured_from_domain
+                else ""
+            )
             print(
                 f"      + [{img.view_type}] {img.width}x{img.height} dhash={img.dhash} "
-                f"| tier={img.source_trust_tier} | saved={full_path}"
+                f"| tier={img.source_trust_tier}{src_tag} | saved={full_path}"
             )
     for rej in dossier.rejected_images:
         detail = f" ({rej['detail']})" if rej.get("detail") else ""
@@ -239,6 +245,11 @@ def main() -> None:
         help="Optional scraper load-ladder cap",
     )
     parser.add_argument("--no-images", action="store_true", help="Skip image download & multimodal check")
+    parser.add_argument(
+        "--allow-untrusted-images",
+        action="store_true",
+        help="Debug flag: allow image candidates outside verified trusted_sources",
+    )
     parser.add_argument("--no-smpc", action="store_true", help="Skip fetching official Greenbook SmPC PDF")
     parser.add_argument("--save-raw", action="store_true", help="Include raw extracted page texts in output JSON")
     parser.add_argument("--out", type=Path, default=None, help="Output JSON file path")
@@ -254,9 +265,13 @@ def main() -> None:
     except ValueError as exc:
         parser.error(str(exc))
 
+    trusted_store = TrustedSourceStore()
+    trusted_store.ensure_seeded()
+
     print("Running Step 2 (Greenbook + Multi-Angle Discovery)...")
     bundle = discover(
         seed,
+        trusted_store=None if args.allow_untrusted_images else trusted_store,
         max_urls=args.max_urls,
         max_results_per_query=args.max_results,
         max_stage=args.max_stage,
@@ -282,6 +297,8 @@ def main() -> None:
         storage=storage,
         product_key="images",
         verify_visuals=not args.no_images,
+        trusted_store=trusted_store,
+        trusted_only_images=not args.allow_untrusted_images,
         progress_cb=lambda msg: print(f"  {msg}", flush=True),
     )
     quote_audit = audit_claims(bundle, dossier)

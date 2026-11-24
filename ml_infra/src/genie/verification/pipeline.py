@@ -1,23 +1,20 @@
-"""Online verification pipeline orchestrator executing all branches within <4s."""
+"""Stateless online verification pipeline orchestrator executing all branches within <4s."""
 import base64
 from pathlib import Path
 import time
 from typing import Any, Dict, Optional, Tuple
 import cv2
 import numpy as np
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from genie.barcode.decode import MultiDecoder
 from genie.barcode.detect import BarcodeDetector
 from genie.common.exceptions import QualityGateError
-from genie.db.models import ReferenceImage
 from genie.schemas.scan import ScanRequest
 from genie.schemas.verdict import VerificationResponse, VerdictState
 from genie.storage.vector_store import VectorStore
 from genie.verification.explain import ExplainabilityEngine
 from genie.verification.fusion import CalibratedFusionEngine
-from genie.verification.resolver import ProductResolver
+from genie.verification.resolver import ProductResolver, ResolvedCandidate
 from genie.verification.signals.barcode_signal import BarcodeSignalEvaluator
 from genie.verification.signals.batch_signal import BatchSignalEvaluator
 from genie.verification.signals.history_signal import HistorySignalEvaluator
@@ -33,13 +30,13 @@ from genie.vision.vlm_review import VLMReviewer
 
 
 class VerificationPipeline:
+    """Stateless ML verification orchestrator. Backend owns persistent SQL state."""
+
     def __init__(
         self,
-        db_session: AsyncSession,
         vector_store: VectorStore,
         enable_vlm_review: bool = False,
     ):
-        self.db = db_session
         self.vector_store = vector_store
         self.enable_vlm_review = enable_vlm_review
 
@@ -52,7 +49,7 @@ class VerificationPipeline:
         self.anomaly_detector = PatchCoreAnomalyDetector()
         self.pack_comparator = PackComparator()
         self.vlm_reviewer = VLMReviewer()
-        self.resolver = ProductResolver(db_session, vector_store)
+        self.resolver = ProductResolver(vector_store)
         self.fusion = CalibratedFusionEngine()
 
         # Signal evaluators
@@ -62,26 +59,26 @@ class VerificationPipeline:
         self.visual_eval = VisualSignalEvaluator()
         self.history_eval = HistorySignalEvaluator()
 
-    async def _load_reference_image(
-        self, version_id: Any
+    @staticmethod
+    def _load_reference_image(
+        resolved: Optional[ResolvedCandidate],
     ) -> Tuple[Optional[np.ndarray], Optional[Dict[str, Any]]]:
-        """Loads canonical reference image and semantic element regions for a product version."""
-        stmt = (
-            select(ReferenceImage)
-            .filter(ReferenceImage.product_version_id == version_id)
-            .order_by(ReferenceImage.trust_tier.asc(), ReferenceImage.created_at.desc())
-        )
-        res = await self.db.execute(stmt)
-        ref_record = res.scalars().first()
-        if not ref_record or not ref_record.storage_path:
+        """Loads canonical reference image from Backend payload (base64) or local storage path."""
+        if not resolved:
             return None, None
 
-        ref_path = Path(ref_record.storage_path)
-        if not ref_path.is_file():
-            return None, ref_record.semantic_regions
+        if resolved.reference_image_base64:
+            ref_bytes = base64.b64decode(resolved.reference_image_base64)
+            ref_img = cv2.imdecode(np.frombuffer(ref_bytes, np.uint8), cv2.IMREAD_COLOR)
+            return ref_img, resolved.semantic_regions
 
-        ref_img = cv2.imread(str(ref_path), cv2.IMREAD_COLOR)
-        return ref_img, ref_record.semantic_regions
+        if resolved.reference_image_path:
+            ref_path = Path(resolved.reference_image_path)
+            if ref_path.is_file():
+                ref_img = cv2.imread(str(ref_path), cv2.IMREAD_COLOR)
+                return ref_img, resolved.semantic_regions
+
+        return None, resolved.semantic_regions
 
     async def verify_scan(self, request: ScanRequest) -> VerificationResponse:
         t0 = time.perf_counter()
@@ -92,7 +89,6 @@ class VerificationPipeline:
             img_bytes = base64.b64decode(first_img.image_bytes_base64)
             img_np = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
         else:
-            # Synthetic 512x512 placeholder if bytes not sent
             img_np = np.zeros((512, 512, 3), dtype=np.uint8)
 
         # 2. Quality Gate (<150ms)
@@ -127,51 +123,54 @@ class VerificationPipeline:
         # 6. Visual Embedding
         embedding = self.visual_embedder.embed_image(rectified_pack)
 
-        # 7. Candidate Resolution
-        resolved = await self.resolver.resolve(gtin=gtin, nafdac_number=nafdac, embedding=embedding)
+        # 7. Candidate Resolution (Backend candidate metadata or VectorStore)
+        resolved = await self.resolver.resolve(
+            gtin=gtin,
+            nafdac_number=nafdac,
+            embedding=embedding,
+            reference_candidate=request.reference_candidate,
+        )
 
         # 7b. Reference Pack Comparison (Color, Element Positioning, Layout, Anomaly)
-        ref_img: Optional[np.ndarray] = None
+        ref_img, semantic_regions = self._load_reference_image(resolved)
         inlier_ratio = 0.5
         anomaly_score = 0.2
         color_score: Optional[float] = None
         layout_score: Optional[float] = None
         visual_inconsistencies: list[str] = []
 
-        if resolved:
-            ref_img, semantic_regions = await self._load_reference_image(resolved.matched_version.id)
-            if ref_img is not None:
-                comp = self.pack_comparator.compare(
-                    query_img=rectified_pack,
+        if ref_img is not None:
+            comp = self.pack_comparator.compare(
+                query_img=rectified_pack,
+                reference_img=ref_img,
+                semantic_regions=semantic_regions,
+            )
+            if not comp.alignment_matched and rect_res.homography_matrix is not None:
+                comp_raw = self.pack_comparator.compare(
+                    query_img=img_np,
                     reference_img=ref_img,
                     semantic_regions=semantic_regions,
                 )
-                if not comp.alignment_matched and rect_res.homography_matrix is not None:
-                    comp_raw = self.pack_comparator.compare(
-                        query_img=img_np,
-                        reference_img=ref_img,
-                        semantic_regions=semantic_regions,
-                    )
-                    if comp_raw.inlier_ratio > comp.inlier_ratio:
-                        comp = comp_raw
-                inlier_ratio = comp.inlier_ratio
-                anomaly_score = comp.anomaly_score
-                color_score = comp.color_score
-                layout_score = comp.layout_score
-                visual_inconsistencies = comp.inconsistencies
+                if comp_raw.inlier_ratio > comp.inlier_ratio:
+                    comp = comp_raw
+            inlier_ratio = comp.inlier_ratio
+            anomaly_score = comp.anomaly_score
+            color_score = comp.color_score
+            layout_score = comp.layout_score
+            visual_inconsistencies = comp.inconsistencies
 
         # 8. Compute Signals
         registered_nafdac_dict = None
         if resolved:
             registered_nafdac_dict = {
-                "brand_name": resolved.product.brand_name,
-                "manufacturer": resolved.product.manufacturer,
-                "status": "active",
+                "brand_name": resolved.brand_name,
+                "manufacturer": resolved.manufacturer,
+                "status": resolved.nafdac_status,
             }
 
         sig_barcode = self.barcode_eval.evaluate(
             barcode_res,
-            resolved_product_gtins=resolved.product.gtin_list if resolved else None,
+            resolved_product_gtins=resolved.gtin_list if resolved else None,
         )
         sig_nafdac = self.nafdac_eval.evaluate(nafdac, registered_nafdac_dict)
         sig_batch = self.batch_eval.evaluate(
@@ -179,6 +178,7 @@ class VerificationPipeline:
             barcode_expiry=barcode_res.get("expiry") if barcode_res else None,
             ocr_batch=ocr_data.batch_number,
             ocr_expiry=ocr_data.expiry_date,
+            batch_regex=resolved.batch_number_regex if resolved else None,
         )
         sig_visual = self.visual_eval.evaluate(
             retrieval_cosine_sim=resolved.confidence if resolved else 0.5,
@@ -191,7 +191,8 @@ class VerificationPipeline:
         )
         sig_history = self.history_eval.evaluate(
             is_legacy_match=resolved.is_legacy_version if resolved else False,
-            version_label=resolved.active_version.version_label if resolved else None,
+            version_label=resolved.version_label if resolved else None,
+            transition_active=resolved.in_transition_window if resolved else True,
             resolved=(resolved is not None),
         )
 
@@ -234,8 +235,8 @@ class VerificationPipeline:
         # 10. Explanation Assembly
         explanation = ExplainabilityEngine.assemble_explanation(
             verdict=verdict,
-            product_name=resolved.product.brand_name if resolved else None,
-            version_label=resolved.active_version.version_label if resolved else None,
+            product_name=resolved.brand_name if resolved else None,
+            version_label=resolved.version_label if resolved else None,
             is_legacy=resolved.is_legacy_version if resolved else False,
             reasons=reasons,
         )
@@ -245,8 +246,8 @@ class VerificationPipeline:
         return VerificationResponse(
             verdict=verdict,
             confidence=confidence,
-            matched_product_name=resolved.product.brand_name if resolved else None,
-            matched_version_label=resolved.active_version.version_label if resolved else None,
+            matched_product_name=resolved.brand_name if resolved else None,
+            matched_version_label=resolved.version_label if resolved else None,
             is_legacy_version=resolved.is_legacy_version if resolved else False,
             explanation=explanation,
             signals=breakdown,

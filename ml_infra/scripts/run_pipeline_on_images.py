@@ -4,11 +4,9 @@ import base64
 import json
 from pathlib import Path
 import cv2
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from genie.barcode.decode import MultiDecoder
 from genie.common.exceptions import QualityGateError
-from genie.db.models import Base
 from genie.schemas.scan import ScanImage, ScanRequest
 from genie.storage.vector_store import InMemoryVectorStore
 from genie.verification.pipeline import VerificationPipeline
@@ -25,18 +23,11 @@ async def main():
         print("No images found in images/")
         return
 
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     vector_store = InMemoryVectorStore()
-
     results = []
 
-    async with session_factory() as db:
+    if True:
         pipeline = VerificationPipeline(
-            db_session=db,
             vector_store=vector_store,
             enable_vlm_review=True,
         )
@@ -150,8 +141,6 @@ async def main():
                         "structural_ssim": round(comp.structural_ssim, 4),
                         "inconsistencies": comp.inconsistencies,
                     })
-
-    await engine.dispose()
 
     report = {"images": results, "pairwise_comparisons": pairwise}
     out_path = images_dir / "pipeline_verdicts.json"

@@ -8,6 +8,20 @@ export function SiteNav() {
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-30">
       <nav className="nav-safe-top mx-auto flex w-full max-w-[480px] items-center justify-between px-4">
+        <Link
+          href="/"
+          className="pointer-events-auto flex h-11 items-center gap-2 rounded-pill border border-line bg-surface pl-2 pr-4 transition-transform duration-200 ease-out active:scale-95"
+        >
+          <span className="flex h-7 w-7 items-center justify-center rounded-pill bg-accent text-accent-ink">
+            <SparkleIcon className="h-4 w-4" />
+          </span>
+          <span className="font-display text-sm font-bold leading-none tracking-tight">
+            genium
+          </span>
+        </Link>
+
+
+
         <Button
           aria-label="Open menu"
           className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-pill border border-line bg-surface text-fg transition-transform duration-200 ease-out active:scale-95"
@@ -27,17 +41,6 @@ export function SiteNav() {
           </svg>
         </Button>
 
-        <Link
-          href="/"
-          className="pointer-events-auto flex h-11 items-center gap-2 rounded-pill border border-line bg-surface pl-2 pr-4 transition-transform duration-200 ease-out active:scale-95"
-        >
-          <span className="flex h-7 w-7 items-center justify-center rounded-pill bg-accent text-accent-ink">
-            <SparkleIcon className="h-4 w-4" />
-          </span>
-          <span className="font-display text-sm font-bold leading-none tracking-tight">
-            genium
-          </span>
-        </Link>
       </nav>
     </header>
   );

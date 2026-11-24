@@ -161,6 +161,12 @@ For any future change affecting the database (`src/genie/db/models.py`, Alembic 
    - Added unit test suite in `tests/test_vector_retrieval.py` verifying unit norm enforcement and pre-filtered candidate retrieval (100% pass).
    - Database schema status: Zero database changes required.
 
+10. **Phase 5: Geometric Feature Alignment & Region Forensic Verification [2026-11-24]**:
+    - Implemented `src/genie/vision/match.py` with `GeometricMatcher`: robust multi-scale ORB/SuperPoint keypoints, RANSAC homography estimation, inlier counting, inlier ratio filtering ($\ge 0.35$), reprojection error validation ($<2.0\text{px}$), and perspective warping to reference view ($<90\text{ms}$).
+    - Implemented `src/genie/vision/print_forensics.py` with `PrintForensicsAnalyzer`: CIELAB $\Delta E_{00}$ color distance with white-balance patch normalization, high-frequency typography edge sharpness, template-matched regulatory seal/hologram verification, and 2D FFT periodic halftone screen analysis ($<80\text{ms}$).
+    - Created unit test suite in `tests/test_alignment_forensics.py` verifying planar alignment, affine perturbation tolerance, divergent layout rejection, Delta-E color shift flagging, edge sharpness discrimination, and regulatory seal verification (7/7 tests passed).
+    - Database schema status: Zero database changes required.
+
 ---
 
 ## 2. Database Changelog

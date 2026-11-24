@@ -21,6 +21,25 @@ For any future change affecting the database (`src/genie/db/models.py`, Alembic 
 
 ## 1. Repository & ML Infrastructure Changelog
 
+### [2026-11-23] Phase 2 Implementation Complete: Barcode Detection, Enhancement & GS1 Parsing
+- **Author:** Genie AI Core Team
+- **Scope:** Complete implementation and verification of Phase 2 from `checklist.md`:
+  - `src/genie/barcode/detect.py`: Gradient edge density detector (Sobel in X direction + morphological closing), cardinal orientation estimator ($0^\circ, 90^\circ, 180^\circ, 270^\circ$), quiet zone padding, YOLO11n barcode session loader, latency $< 40\text{ms}$.
+  - `src/genie/barcode/enhance.py`: Auto-deskew across 4 cardinal rotations, CLAHE contrast enhancement (`clipLimit=2.5, tileGridSize=(8,8)`), morphological binarization, Otsu thresholding, unsharp masking, and 2x-4x super-resolution scaling for tiny codes, latency $< 60\text{ms}$.
+  - `src/genie/barcode/decode.py`: Multi-decoder ensemble integrating `zxing-cpp`, `pyzbar`, `OpenCV WeChat QR`, `pylibdmtx`, and fallback OCR for human-readable digits, latency $< 150\text{ms}$.
+  - `src/genie/barcode/gs1_parser.py`: Unified bracketed and FNC1 stream parsing via `biip` and native fallback, extracting AIs `(01)` GTIN-14, `(10)` Batch, `(17)` Expiry (with `DD=00` month-end handling), `(21)` Serial, GS1 Modulo-10 checksum validation, and Nigeria prefix hint (`615`), latency $< 5\text{ms}$.
+  - `src/genie/barcode/digital_link.py`: GS1 Digital Link URI parser, domain whitelist sandboxing, and salt+HMAC cryptographic serial duplicate replay tracking.
+  - Test suites: `test_barcode_detect.py`, `test_barcode_decode.py`, `test_gs1_parser.py`, `test_gtin_parser.py` passing across all 28 unit tests.
+- **Database Schema Changes:** None (no database migrations or model modifications).
+
+### [2026-11-23] Phase 1 Implementation Complete: Quality Gating & Pack Rectification
+- **Author:** Genie AI Core Team
+- **Scope:** Complete implementation and verification of Phase 1 from `checklist.md`:
+  - `src/genie/vision/quality.py`: Modified Laplacian Variance blur metric, HSV specular glare masking ($V > 245, S < 35, \text{glare} > 8\%$), pack bounding area ratio estimation, real-time guidance codes (`HOLD_STEADY_BLURRY`, `REDUCE_GLARE`, `MOVE_CLOSER`, `SHOW_BACK_PANEL`), latency verification ($< 120\text{ms}$).
+  - `src/genie/vision/pack_detect.py`: 4-corner keypoint detection, homography matrix calculation, planar perspective warping to canonical $512\times 512$, cylindrical unrolling algorithm for round syrup bottles/vials ($x' = R \arcsin((x-x_c)/R)$), reprojection error $< 3.0\text{px}$, latency verification ($< 180\text{ms}$).
+  - `tests/test_quality_gate.py` & `tests/test_pack_detect.py`: 7 comprehensive unit test suites passing in pytest.
+- **Database Schema Changes:** None (no database migrations or model modifications).
+
 ### [2026-11-23] Initial Repository Scaffolding (`/ml_infra` Root)
 - **Author:** Genie AI Core Team
 - **Scope:** Complete initialization and scaffolding of the Machine Learning, Computer Vision, and Verification Infrastructure based on `ML_BUILD_PLAN.md`.

@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PackagingSpec(BaseModel):
@@ -16,13 +16,13 @@ class PackagingSpec(BaseModel):
 
 
 class ProductVersionBase(BaseModel):
-    version_label: str = Field(..., example="2024 Design with Holographic Seal")
+    version_label: str = Field(..., json_schema_extra={"example": "2024 Design with Holographic Seal"})
     valid_from: date
     valid_to: Optional[date] = None
-    status: str = Field(default="active", example="active")  # active, superseded, retired
+    status: str = Field(default="active", json_schema_extra={"example": "active"})
     packaging_spec: PackagingSpec = Field(default_factory=PackagingSpec)
-    batch_number_regex: Optional[str] = Field(None, example="^[A-Z]{2}[0-9]{4}$")
-    shelf_life_months: int = Field(default=24, example=24)
+    batch_number_regex: Optional[str] = Field(None, json_schema_extra={"example": "^[A-Z]{2}[0-9]{4}$"})
+    shelf_life_months: int = Field(default=24, json_schema_extra={"example": 24})
 
 
 class ProductVersionCreate(ProductVersionBase):
@@ -31,10 +31,9 @@ class ProductVersionCreate(ProductVersionBase):
 
 
 class ProductVersionRead(ProductVersionBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     product_id: UUID
     evidence_ids: List[str]
     created_at: datetime
-
-    class Config:
-        from_attributes = True

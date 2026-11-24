@@ -12,7 +12,16 @@ class HistorySignalEvaluator:
         is_legacy_match: bool,
         version_label: Optional[str] = None,
         transition_active: bool = True,
+        resolved: bool = True,
     ) -> SignalResult:
+        if not resolved:
+            return SignalResult(
+                score=0.50,
+                confidence=0.10,
+                reasons=["Product identity unresolved; packaging version history cannot be verified."],
+                evidence={"legacy_version": None, "transition_valid": None},
+            )
+
         if not is_legacy_match:
             return SignalResult(
                 score=1.0,

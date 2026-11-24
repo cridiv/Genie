@@ -40,37 +40,38 @@ async def main():
             vector_store=vector_store,
             enable_vlm_review=True,
         )
-        # Enable VLM-assisted OCR + larger timeout for live NVIDIA NIM call
-        pipeline.ocr.enable_vlm = True
+        # Run VLM only once per image inside verify_scan + standalone VLM forensic review
+        pipeline.ocr.enable_vlm = False
         pipeline.vlm_reviewer.timeout_seconds = 60.0
 
         for img_path in image_files:
-            print(f"\n=== Processing: {img_path.name} ===")
+            print(f"\n=== Processing: {img_path.name} ===", flush=True)
             img_bytes = img_path.read_bytes()
             img_np = cv2.imdecode(
-                cv2.imdecode(
-                    __import__("numpy").frombuffer(img_bytes, __import__("numpy").uint8),
-                    cv2.IMREAD_COLOR,
-                )
-                if False
-                else __import__("numpy").frombuffer(img_bytes, __import__("numpy").uint8),
+                __import__("numpy").frombuffer(img_bytes, __import__("numpy").uint8),
                 cv2.IMREAD_COLOR,
             )
 
             # 1. Quality Gate check
             q_res = pipeline.quality_gate.evaluate(img_np)
+            print("  [1] Quality Gate done", flush=True)
             # 2. Barcode decode check
             rect_res = pipeline.pack_rectifier.rectify(img_np)
             barcode_res = MultiDecoder.decode(rect_res.rectified_image) or MultiDecoder.decode(img_np)
-            # 3. OCR check (local + VLM)
+            print("  [2] Barcode decode done", flush=True)
+            # 3. OCR check (local)
             ocr_res = pipeline.ocr.extract_text(img_np)
+            print("  [3] OCR done", flush=True)
             # 4. VLM forensic review (standalone)
             vlm_res = await pipeline.vlm_reviewer.review_packaging_async(img_np)
+            print("  [4] VLM review done", flush=True)
 
-            # 5. Full VerificationPipeline execution
+            # 5. Full VerificationPipeline execution (with VLM second-opinion triage enabled)
+            pipeline.enable_vlm_review = True
             img_b64 = base64.b64encode(img_bytes).decode("utf-8")
             scan_req = ScanRequest(
-                images=[ScanImage(image_bytes_base64=img_b64, face_hint="front")]
+                images=[ScanImage(image_bytes_base64=img_b64, face_hint="front")],
+                manual_nafdac=ocr_res.nafdac_number or vlm_res.detected_nafdac,
             )
 
             pipeline_out = {}
@@ -98,7 +99,6 @@ async def main():
                     "passed": q_res.passed,
                     "blur_score": round(q_res.blur_score, 2),
                     "glare_ratio": round(q_res.glare_ratio, 4),
-                    "area_ratio": round(q_res.area_ratio, 4),
                     "guidance_codes": q_res.guidance_codes,
                 },
                 "barcode": barcode_res,
@@ -106,7 +106,6 @@ async def main():
                     "nafdac_number": ocr_res.nafdac_number,
                     "batch_number": ocr_res.batch_number,
                     "expiry_date": ocr_res.expiry_date,
-                    "brand_name": ocr_res.brand_name,
                     "raw_text_lines": ocr_res.raw_text_lines[:15],
                 },
                 "vlm_forensic_review": {

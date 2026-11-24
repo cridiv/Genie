@@ -1,0 +1,231 @@
+{
+  "images": [
+    {
+      "filename": "s9g8qx7q77.jpeg",
+      "resolution": "1500x1125",
+      "quality_gate": {
+        "passed": true,
+        "blur_score": 11457.85,
+        "glare_ratio": 0.0,
+        "guidance_codes": []
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.8,
+        "confidence": 0.9,
+        "is_consistent": false,
+        "triage_verdict": "Suspicious",
+        "detected_nafdac": "B4-6458",
+        "detected_batch": null,
+        "detected_expiry": null,
+        "reasons": [
+          "Left box displays 'NAFDAC Reg' without visible registration number, while right box shows 'NAFDAC Reg. No.: B4-6458'",
+          "Right box includes a tamper-evident sticker with barcode/text code (028730023401610/08039012030) absent on left box",
+          "Left box specifies '10 x 1 x 6 Tablets' (outer carton) while right is '1 x 6 Tablets' (inner unit), but NAFDAC number discrepancy indicates inconsistency"
+        ],
+        "discrepancies": [
+          "Left box missing NAFDAC registration number",
+          "Right box has NAFDAC Reg. No.: B4-6458 while left shows only 'NAFDAC Reg' without number"
+        ]
+      },
+      "pipeline_result": {
+        "verdict": "Suspicious",
+        "confidence": 0.7652,
+        "matched_product_name": null,
+        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Barcode not detected or unreadable.. Please report this scan to NAFDAC enforcement.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.2,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC number B4-6458 not found in official Greenbook registry.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified.",
+            "Left box missing NAFDAC registration number",
+            "Right box has NAFDAC Reg. No.: B4-6458",
+            "Left box missing NAFDAC registration number",
+            "Right box has NAFDAC Reg. No.: B4-6458"
+          ]
+        },
+        "execution_time_ms": 19348.24
+      }
+    },
+    {
+      "filename": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "resolution": "1280x960",
+      "quality_gate": {
+        "passed": true,
+        "blur_score": 5717.47,
+        "glare_ratio": 0.0001,
+        "guidance_codes": []
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.5,
+        "confidence": 0.8,
+        "is_consistent": false,
+        "triage_verdict": "Suspicious",
+        "detected_nafdac": null,
+        "detected_batch": null,
+        "detected_expiry": null,
+        "reasons": [
+          "Hand-drawn blue pen markings on packaging",
+          "Torn edges on box corners",
+          "Absence of NAFDAC registration number, batch, and expiry date"
+        ],
+        "discrepancies": [
+          "Hand-drawn pen markings",
+          "Physical damage to packaging"
+        ]
+      },
+      "pipeline_result": {
+        "verdict": "Suspicious",
+        "confidence": 0.25,
+        "matched_product_name": null,
+        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Insufficient verifiable signals detected from uploaded scan.. Please report this scan to NAFDAC enforcement.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.5,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC registration number not located by OCR.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified.",
+            "Hand-drawn pen markings on packaging",
+            "Missing regulatory details (NAFDAC, batch, expiry)"
+          ]
+        },
+        "execution_time_ms": 7214.8
+      }
+    },
+    {
+      "filename": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "resolution": "1280x960",
+      "quality_gate": {
+        "passed": true,
+        "blur_score": 7235.04,
+        "glare_ratio": 0.003,
+        "guidance_codes": []
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.95,
+        "confidence": 0.95,
+        "is_consistent": true,
+        "triage_verdict": "Consistent with genuine",
+        "detected_nafdac": "C4-0143",
+        "detected_batch": "JT663",
+        "detected_expiry": "10/2027",
+        "reasons": [
+          "Sharp, clear print with standard pharmaceutical layout and warnings",
+          "Valid NAFDAC registration number (C4-0143) and logical expiry date (10/2027) following manufacturing date (11/2024)",
+          "Intact box with no visible tears, hand-drawn markings, or missing security seals; holographic sticker is present"
+        ],
+        "discrepancies": []
+      },
+      "pipeline_result": {
+        "verdict": "Suspicious",
+        "confidence": 0.7652,
+        "matched_product_name": null,
+        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Barcode not detected or unreadable.. Please report this scan to NAFDAC enforcement.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.2,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC number C4-0143 not found in official Greenbook registry.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified."
+          ]
+        },
+        "execution_time_ms": 20581.14
+      }
+    }
+  ],
+  "pairwise_comparisons": [
+    {
+      "image_a": "s9g8qx7q77.jpeg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "overall_similarity_score": 0.1857,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2333,
+      "color_score": 0.2466,
+      "delta_e_ab": 21.48,
+      "layout_score": 0.286,
+      "structural_ssim": 0.3254,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 7, ratio: 0.23).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 21.5 > 10.0, hist corr = 0.41).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-left, upper-mid-center-left, upper-mid-center-right, upper-mid-right."
+      ]
+    },
+    {
+      "image_a": "s9g8qx7q77.jpeg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "overall_similarity_score": 0.2541,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2273,
+      "color_score": 0.5058,
+      "delta_e_ab": 14.8,
+      "layout_score": 0.26,
+      "structural_ssim": 0.2934,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.23).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 14.8 > 10.0, hist corr = 0.60).",
+        "Structural layout deviations detected in pack zone(s): top-center-left, top-center-right, top-right, upper-mid-left."
+      ]
+    },
+    {
+      "image_a": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "overall_similarity_score": 0.427,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2121,
+      "color_score": 0.6418,
+      "delta_e_ab": 14.34,
+      "layout_score": 0.3563,
+      "structural_ssim": 0.4016,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 7, ratio: 0.21).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 14.3 > 10.0, hist corr = 0.95).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-center-left, upper-mid-center-right, lower-mid-left, lower-mid-center-left."
+      ]
+    }
+  ]
+}

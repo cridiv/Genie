@@ -36,6 +36,14 @@ class BatchSignalEvaluator:
                     reasons=[f"Batch code format '{ocr_batch}' diverges from manufacturer pattern."],
                 )
 
+        if not (barcode_batch or ocr_batch or barcode_expiry or ocr_expiry):
+            return SignalResult(
+                score=0.50,
+                confidence=0.20,
+                reasons=["Batch number and expiry date were not detected on the scanned face."],
+                evidence={"batch": None, "expiry": None},
+            )
+
         return SignalResult(
             score=0.90,
             confidence=0.75,

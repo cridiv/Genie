@@ -245,6 +245,14 @@ For any future change affecting the database (`src/genie/db/models.py`, Alembic 
     - Full test suite passed: **76/76 tests passed** across `tests/` and `evaluation/`.
     - Database schema status: Zero database changes required (`ReferenceImage` already includes `storage_path` and `semantic_regions`).
 
+20. **Post-Evaluation Model & Pipeline Remediation (Phase 11) [2026-11-24]**:
+    - Remediated 7 pipeline defects surfaced by real-image testing on `/ml_infra/images`:
+      1. Eliminated false-confidence defaults in [`batch_signal.py`](src/genie/verification/signals/batch_signal.py) (`0.90` $\rightarrow$ `0.50` when undetected), [`history_signal.py`](src/genie/verification/signals/history_signal.py) (`1.00` $\rightarrow$ `0.50` when unresolved), and [`visual_signal.py`](src/genie/verification/signals/visual_signal.py) (`0.59` $\rightarrow$ `0.50` when no reference pack exists).
+      2. Expanded `NAFDAC_PATTERNS` in [`ocr.py`](src/genie/vision/ocr.py) from `[A-B]\d` to `[A-Z]\d` (supporting `C4-XXXX` / `D4-XXXX`) and added `rapidocr_onnxruntime`, `easyocr`, and `pytesseract` fallback chain.
+      3. Added bounded `pylibdmtx.decode(..., timeout=40, max_count=1)` in [`decode.py`](src/genie/barcode/decode.py) and crop-first `BarcodeDetector` localization in [`pipeline.py`](src/genie/verification/pipeline.py).
+      4. Calibrated [`vlm_review.py`](src/genie/vision/vlm_review.py) multi-pack prompt and integrated high-confidence VLM tampering discrepancies into [`pipeline.py`](src/genie/verification/pipeline.py).
+    - Database schema status: Zero database changes required.
+
 ---
 
 ## 2. Database Changelog

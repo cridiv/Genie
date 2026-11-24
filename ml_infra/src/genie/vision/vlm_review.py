@@ -98,7 +98,10 @@ class VLMReviewer:
             prompt_text += (
                 "Inspect this query packaging scan. Read all visible printed text, "
                 "especially the NAFDAC registration number, Batch/Lot number, and Expiry date. "
-                "Identify brand name, manufacturer, and evaluate print sharpness and layout consistency.\n\n"
+                "Identify brand name, manufacturer, and evaluate print sharpness, tampering signs "
+                "(e.g. torn labels, hand-drawn pen markings, missing regulatory seals), and layout consistency. "
+                "Note: If two boxes are shown side-by-side representing an outer multipack carton (e.g. '10 x 1 x 6') "
+                "and its inner unit pack (e.g. '1 x 6'), that outer-vs-inner pack count difference is normal and NOT a defect.\n\n"
             )
             content_items.append({"type": "text", "text": prompt_text})
             content_items.append({

@@ -13,7 +13,24 @@ class VisualSignalEvaluator:
         color_score: Optional[float] = None,
         layout_score: Optional[float] = None,
         inconsistencies: Optional[List[str]] = None,
+        reference_available: bool = True,
     ) -> SignalResult:
+        if not reference_available:
+            reasons = (
+                list(inconsistencies)
+                if inconsistencies
+                else ["No canonical reference pack image available in database for visual comparison."]
+            )
+            return SignalResult(
+                score=0.50,
+                confidence=0.10,
+                reasons=reasons,
+                evidence={
+                    "cosine_similarity": retrieval_cosine_sim,
+                    "reference_available": False,
+                },
+            )
+
         if color_score is not None and layout_score is not None:
             visual_score = (
                 0.20 * retrieval_cosine_sim

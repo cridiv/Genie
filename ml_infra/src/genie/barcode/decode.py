@@ -87,11 +87,11 @@ class MultiDecoder:
         except Exception:
             pass
 
-        # 4. Quaternary: pylibdmtx for stubborn DataMatrix
+        # 4. Quaternary: pylibdmtx for stubborn DataMatrix (bounded timeout to prevent stalls on large images)
         try:
             from pylibdmtx import pylibdmtx
-            for var in variants:
-                dms = pylibdmtx.decode(var)
+            for var in variants[:3]:
+                dms = pylibdmtx.decode(var, timeout=40, max_count=1)
                 if dms:
                     d = dms[0]
                     elapsed = (time.perf_counter() - t0) * 1000.0

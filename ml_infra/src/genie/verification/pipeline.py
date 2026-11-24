@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from genie.barcode.decode import MultiDecoder
+from genie.barcode.detect import BarcodeDetector
 from genie.common.exceptions import QualityGateError
 from genie.db.models import ReferenceImage
 from genie.schemas.scan import ScanRequest
@@ -45,6 +46,7 @@ class VerificationPipeline:
         # Components
         self.quality_gate = ImageQualityGate()
         self.pack_rectifier = PackDetectorRectifier()
+        self.barcode_detector = BarcodeDetector()
         self.visual_embedder = VisualEmbedder()
         self.ocr = PackagingOCR(enable_vlm=False)
         self.anomaly_detector = PatchCoreAnomalyDetector()
@@ -106,8 +108,14 @@ class VerificationPipeline:
         rect_res = self.pack_rectifier.rectify(img_np)
         rectified_pack = rect_res.rectified_image
 
-        # 4. Barcode Branch
-        barcode_res = MultiDecoder.decode(rectified_pack)
+        # 4. Barcode Branch (crop-first localization, then full-frame fallback)
+        barcode_res = None
+        for region in self.barcode_detector.detect_regions(img_np)[:3]:
+            barcode_res = MultiDecoder.decode(region.crop_image)
+            if barcode_res:
+                break
+        if not barcode_res:
+            barcode_res = MultiDecoder.decode(rectified_pack)
         if not barcode_res and request.manual_gtin:
             barcode_res = {"gtin": request.manual_gtin, "check_digit_valid": True}
         gtin = barcode_res.get("gtin") if barcode_res else request.manual_gtin
@@ -179,10 +187,12 @@ class VerificationPipeline:
             color_score=color_score,
             layout_score=layout_score,
             inconsistencies=visual_inconsistencies,
+            reference_available=(ref_img is not None),
         )
         sig_history = self.history_eval.evaluate(
             is_legacy_match=resolved.is_legacy_version if resolved else False,
             version_label=resolved.active_version.version_label if resolved else None,
+            resolved=(resolved is not None),
         )
 
         signals_dict = {
@@ -196,14 +206,28 @@ class VerificationPipeline:
         # 9. Calibrated Fusion
         verdict, confidence, breakdown, reasons = self.fusion.fuse(signals_dict)
 
-        # 9b. VLM Second-Opinion Triage Review (never sole decider)
+        # 9b. VLM Second-Opinion Triage Review (never sole decider when deterministic checks pass)
         if self.enable_vlm_review and verdict in (VerdictState.SUSPICIOUS, VerdictState.CANNOT_VERIFY):
             try:
                 vlm_review = await self.vlm_reviewer.review_packaging_async(
-                    rectified_pack, reference_image=ref_img
+                    img_np, reference_image=ref_img
                 )
-                if vlm_review and vlm_review.discrepancies:
-                    reasons.extend(vlm_review.discrepancies)
+                if vlm_review:
+                    if vlm_review.discrepancies:
+                        for d in vlm_review.discrepancies:
+                            if d not in reasons:
+                                reasons.append(d)
+                            if d not in breakdown.reasons:
+                                breakdown.reasons.append(d)
+                    if (
+                        verdict == VerdictState.CANNOT_VERIFY
+                        and not vlm_review.is_consistent
+                        and vlm_review.triage_verdict == "Suspicious"
+                        and vlm_review.confidence >= 0.70
+                        and vlm_review.discrepancies
+                    ):
+                        verdict = VerdictState.SUSPICIOUS
+                        confidence = round(min(confidence, float(vlm_review.confidence)), 4)
             except Exception:
                 pass
 

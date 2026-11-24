@@ -1,17 +1,30 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { RegisterServiceWorker } from "@/components/pwa/register-sw";
-import { BottomNav } from "@/components/app/bottom-nav";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const bricolage = localFont({
+  src: [
+    {
+      path: "../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2",
+      weight: "400 800",
+      style: "normal",
+    },
+  ],
+  variable: "--font-bricolage",
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const dmSans = localFont({
+  src: [
+    {
+      path: "../node_modules/@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2",
+      weight: "400 600",
+      style: "normal",
+    },
+  ],
+  variable: "--font-dm-sans",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -45,14 +58,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${bricolage.variable} ${dmSans.variable} h-full antialiased`}
     >
       <body className="min-h-dvh">
         <RegisterServiceWorker />
         <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col">
           {children}
         </div>
-        <BottomNav />
       </body>
     </html>
   );

@@ -14,7 +14,6 @@ from genie.common.exceptions import QualityGateError
 async def lifespan(app: FastAPI):
     # Initialize models and warm caches
     yield
-    # Cleanup
 
 
 app = FastAPI(

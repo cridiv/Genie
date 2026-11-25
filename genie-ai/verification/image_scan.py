@@ -117,6 +117,8 @@ class VisualComparisonOutput(BaseModel):
 class ImageVerificationResponse(BaseModel):
     """Full response returned by `POST /v1/verify/image` and `scripts/verify_image.py`."""
 
+    scan_id: Optional[str] = None
+    scan_json_path: Optional[str] = None
     extracted_scan: ExtractedImageScan
     verification: OrchestratedVerificationResponse
     visual_comparison_used: bool = False
@@ -320,23 +322,37 @@ def verify_image_bytes(
         all_dossiers = orchestrator._current_dossiers()
         resolved, _rec = _resolve_product(scan, all_dossiers, orchestrator.greenbook)
         if resolved is not None:
-            visual_match, ref_paths = compare_image_with_references(
-                image_bytes,
-                mime_type,
-                resolved,
-                orchestrator.products_dir,
-                llm=provider,
-                angle=extracted.angle,
-            )
-            if visual_match is not None:
-                scan = scan.model_copy(update={"visual_match": visual_match})
-                visual_used = True
+            try:
+                visual_match, ref_paths = compare_image_with_references(
+                    image_bytes,
+                    mime_type,
+                    resolved,
+                    orchestrator.products_dir,
+                    llm=provider,
+                    angle=extracted.angle,
+                )
+                if visual_match is not None:
+                    scan = scan.model_copy(update={"visual_match": visual_match})
+                    visual_used = True
+            except Exception:  # noqa: BLE001
+                visual_used = False
+                ref_paths = []
 
     verification = orchestrator.verify_scan(scan, auto_discover=auto_discover)
-    return ImageVerificationResponse(
+    resp = ImageVerificationResponse(
+        scan_id=verification.scan_id,
+        scan_json_path=verification.scan_json_path,
         extracted_scan=extracted,
         verification=verification,
         visual_comparison_used=visual_used,
         reference_images_compared=ref_paths,
         vision_model=model_name,
     )
+    if verification.scan_id:
+        json_path = orchestrator.scan_store.update_scan_payload(
+            verification.scan_id,
+            resp.model_dump(mode="json"),
+            source_endpoint="verify_image",
+        )
+        resp = resp.model_copy(update={"scan_json_path": json_path})
+    return resp

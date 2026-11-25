@@ -12,9 +12,9 @@ export function SiteNav() {
           href="/"
           className="pointer-events-auto flex h-11 items-center gap-2 rounded-pill border border-line bg-surface pl-2 pr-4 transition-transform duration-200 ease-out active:scale-95"
         >
-          <span className="flex h-7 w-7 items-center justify-center rounded-pill bg-accent text-accent-ink">
+          {/*<span className="flex h-7 w-7 items-center justify-center rounded-pill bg-accent text-accent-ink">
             <SparkleIcon className="h-4 w-4" />
-          </span>
+          </span>*/}
           <span className="font-display text-sm font-bold leading-none tracking-tight">
             genium
           </span>

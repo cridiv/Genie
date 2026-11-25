@@ -23,11 +23,14 @@ from verification.schemas import ScanInput, VerificationResult
 from verification.signals.visual import _approved_versions
 
 from .jobs import DiscoveryJobRunner, JobStore
+from .scans import ScanStore
 
 
 class OrchestratedVerificationResponse(BaseModel):
-    """Full orchestrated verification response including timing and optional async discovery job."""
+    """Full orchestrated verification response including scan_id, timing, and optional async discovery job."""
 
+    scan_id: Optional[str] = None
+    scan_json_path: Optional[str] = None
     result: VerificationResult
     execution_time_ms: float
     discovery_job_id: Optional[str] = None
@@ -65,6 +68,8 @@ class GenieOrchestrator:
         self.trusted_store.ensure_seeded()
 
         self.job_store = JobStore(self.genie_db_path)
+        self.scans_dir = self.genie_db_path.parent / "scans"
+        self.scan_store = ScanStore(self.genie_db_path, scans_dir=self.scans_dir)
         self.job_runner = DiscoveryJobRunner(
             job_store=self.job_store,
             products_dir=self.products_dir,
@@ -128,13 +133,34 @@ class GenieOrchestrator:
                 job_status = job["status"]
 
         elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 2)
-        return OrchestratedVerificationResponse(
+        scan_id = ScanStore.new_scan_id()
+        response = OrchestratedVerificationResponse(
+            scan_id=scan_id,
             result=result,
             execution_time_ms=elapsed_ms,
             discovery_job_id=job_id,
             discovery_job_status=job_status,
             discovery_deduplicated=deduped,
         )
+        mp = result.matched_product or {}
+        json_path = self.scan_store.record_scan(
+            scan_id=scan_id,
+            source_endpoint="verify",
+            product_name=mp.get("brand_name") or scan.product_name_hint,
+            nafdac_number=mp.get("nafdac_number") or scan.nafdac_number,
+            verdict=result.verdict,
+            ml_infra_verdict=result.ml_infra_verdict,
+            confidence=result.confidence,
+            coverage=result.coverage,
+            reference_level=result.reference_level,
+            summary=result.summary,
+            limitations=list(result.limitations),
+            counterfeit_tell_hits=[h.model_dump() for h in result.counterfeit_tell_hits],
+            discovery_job_id=job_id,
+            execution_time_ms=elapsed_ms,
+            payload=response.model_dump(mode="json"),
+        )
+        return response.model_copy(update={"scan_json_path": json_path})
 
     @staticmethod
     def _seed_from_scan(scan: ScanInput, result: VerificationResult) -> Optional[DiscoverySeed]:
@@ -161,6 +187,18 @@ class GenieOrchestrator:
 
     def list_jobs(self, *, limit: int = 20, status: Optional[str] = None) -> List[Dict[str, Any]]:
         return self.job_store.list_jobs(limit=limit, status=status)
+
+    def get_scan(self, scan_id: str) -> Optional[Dict[str, Any]]:
+        return self.scan_store.get_scan(scan_id)
+
+    def list_scans(
+        self,
+        *,
+        limit: int = 20,
+        verdict: Optional[str] = None,
+        nafdac_number: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        return self.scan_store.list_scans(limit=limit, verdict=verdict, nafdac_number=nafdac_number)
 
     def list_products(self) -> List[Dict[str, Any]]:
         items: List[Dict[str, Any]] = []

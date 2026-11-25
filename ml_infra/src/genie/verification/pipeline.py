@@ -1,5 +1,6 @@
 """Stateless online verification pipeline orchestrator executing all branches within <4s."""
 import base64
+import logging
 from pathlib import Path
 import time
 from typing import Any, Dict, Optional, Tuple
@@ -9,7 +10,10 @@ import numpy as np
 from genie.barcode.decode import MultiDecoder
 from genie.barcode.detect import BarcodeDetector
 from genie.common.exceptions import QualityGateError
+from genie.integrations.genie_ai_client import GenieAIClient
 from genie.schemas.scan import ScanRequest
+
+logger = logging.getLogger(__name__)
 from genie.schemas.verdict import VerificationResponse, VerdictState
 from genie.storage.vector_store import VectorStore
 from genie.verification.explain import ExplainabilityEngine
@@ -36,9 +40,11 @@ class VerificationPipeline:
         self,
         vector_store: VectorStore,
         enable_vlm_review: bool = False,
+        genie_ai_client: Optional[GenieAIClient] = None,
     ):
         self.vector_store = vector_store
         self.enable_vlm_review = enable_vlm_review
+        self.genie_ai_client = genie_ai_client or GenieAIClient()
 
         # Components
         self.quality_gate = ImageQualityGate()
@@ -133,6 +139,7 @@ class VerificationPipeline:
 
         # 7b. Reference Pack Comparison (Color, Element Positioning, Layout, Anomaly)
         ref_img, semantic_regions = self._load_reference_image(resolved)
+        comp = None
         inlier_ratio = 0.5
         anomaly_score = 0.2
         color_score: Optional[float] = None
@@ -158,6 +165,68 @@ class VerificationPipeline:
             color_score = comp.color_score
             layout_score = comp.layout_score
             visual_inconsistencies = comp.inconsistencies
+
+        # 7c. Optional GENIE AI Product Intelligence & Multi-Signal Verification Bridge
+        if self.genie_ai_client and self.genie_ai_client.enabled:
+            try:
+                bridge_payload: Dict[str, Any] = {
+                    "ocr": {
+                        "nafdac_number": ocr_data.nafdac_number,
+                        "batch_number": ocr_data.batch_number,
+                        "expiry_date": ocr_data.expiry_date,
+                        "brand_name": ocr_data.brand_name,
+                        "raw_text_lines": list(ocr_data.raw_text_lines or []),
+                    },
+                    "barcode": barcode_res if isinstance(barcode_res, dict) else None,
+                    "manual_gtin": request.manual_gtin,
+                    "manual_nafdac": request.manual_nafdac,
+                    "product_name_hint": (
+                        resolved.brand_name if resolved else ocr_data.brand_name
+                    ),
+                    "matched_version_label": (
+                        resolved.version_label if resolved else None
+                    ),
+                    "is_legacy_version": bool(resolved.is_legacy_version) if resolved else False,
+                    "retrieval_similarity": float(resolved.confidence) if resolved else None,
+                }
+                if comp is not None:
+                    bridge_payload["pack_comparison"] = {
+                        "overall_similarity_score": comp.overall_similarity_score,
+                        "is_counterfeit_suspect": comp.is_counterfeit_suspect,
+                        "alignment_matched": comp.alignment_matched,
+                        "inlier_ratio": comp.inlier_ratio,
+                        "reprojection_error": comp.reprojection_error,
+                        "color_score": comp.color_score,
+                        "delta_e_ab": comp.delta_e_ab,
+                        "layout_score": comp.layout_score,
+                        "structural_ssim": comp.structural_ssim,
+                        "anomaly_score": comp.anomaly_score,
+                        "sharpness_ratio": comp.sharpness_ratio,
+                        "element_checks": [
+                            {
+                                "name": e.name,
+                                "shift_px": e.shift_px,
+                                "local_similarity": e.local_similarity,
+                                "passed": e.passed,
+                                "status": e.status,
+                            }
+                            for e in comp.element_checks
+                        ],
+                        "flagged_grid_zones": list(comp.flagged_grid_zones),
+                        "inconsistencies": list(comp.inconsistencies),
+                    }
+                bridged = await self.genie_ai_client.verify_ml_infra_payload(
+                    bridge_payload,
+                    auto_discover=True,
+                )
+                if bridged is not None:
+                    bridged.execution_time_ms = (time.perf_counter() - t0) * 1000.0
+                    return bridged
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "GENIE AI verification bridge failed, falling back to local fusion: %s",
+                    exc,
+                )
 
         # 8. Compute Signals
         registered_nafdac_dict = None

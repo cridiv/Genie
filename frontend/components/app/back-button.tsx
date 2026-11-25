@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { startRouteProgress } from "@/components/app/route-progress";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 
 export function BackButton() {
@@ -9,7 +10,10 @@ export function BackButton() {
   return (
     <button
       type="button"
-      onClick={() => router.back()}
+      onClick={() => {
+        startRouteProgress();
+        router.back();
+      }}
       aria-label="Go back"
       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-line bg-card text-fg transition active:scale-95"
     >

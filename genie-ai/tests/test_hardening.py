@@ -193,7 +193,8 @@ class TestEvidenceGateAndHardening(unittest.TestCase):
         engine = VerificationEngine(products_dir=REPO_ROOT / "data" / "products")
 
         # 1. Kesartem C4-0143 resolved straight from 9,065-drug Greenbook (Level C, recommends discovery)
-        res_kes = engine.verify(
+        gb_only_engine = VerificationEngine(dossiers=[])
+        res_kes = gb_only_engine.verify(
             ScanInput(
                 nafdac_number=" c4 - 0143 ",  # messy spacing & lowercase
                 ocr_text="Kesartem 80/480 mg Tablets Kessington",

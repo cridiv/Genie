@@ -15,6 +15,11 @@ from pydantic import BaseModel
 
 from discovery.models import DiscoverySeed
 from orchestrator import GenieOrchestrator, OrchestratedVerificationResponse
+from verification.adapters import (
+    MLInfraVerifyPayload,
+    scan_input_from_ml_infra,
+    to_ml_infra_response,
+)
 from verification.image_scan import (
     ImageVerificationResponse,
     infer_mime_type,
@@ -68,6 +73,19 @@ def create_app(orchestrator: Optional[GenieOrchestrator] = None) -> FastAPI:
         auto_discover: bool = Query(default=True, description="Enqueue async discovery if product needs enrichment"),
     ) -> OrchestratedVerificationResponse:
         return orch.verify_scan(scan, auto_discover=auto_discover)
+
+    @app.post("/v1/verify/ml-infra")
+    def post_verify_ml_infra(
+        payload: MLInfraVerifyPayload,
+        auto_discover: bool = Query(
+            default=True,
+            description="Enqueue async discovery if product needs enrichment",
+        ),
+    ) -> Dict[str, Any]:
+        """Bridge endpoint for `ml_infra`: accepts OCR/Barcode/PackComparator payload and returns `ml_infra` VerificationResponse."""
+        scan = scan_input_from_ml_infra(payload)
+        orch_resp = orch.verify_scan(scan, auto_discover=auto_discover)
+        return to_ml_infra_response(orch_resp, payload=payload)
 
     @app.post("/v1/verify/image", response_model=ImageVerificationResponse)
     async def post_verify_image(
@@ -131,6 +149,21 @@ def create_app(orchestrator: Optional[GenieOrchestrator] = None) -> FastAPI:
         if job is None:
             raise HTTPException(status_code=404, detail=f"Discovery job {job_id!r} not found")
         return job
+
+    @app.get("/v1/scans")
+    def get_scans(
+        limit: int = Query(default=20, ge=1, le=100),
+        verdict: Optional[str] = Query(default=None),
+        nafdac_number: Optional[str] = Query(default=None),
+    ) -> List[Dict[str, Any]]:
+        return orch.list_scans(limit=limit, verdict=verdict, nafdac_number=nafdac_number)
+
+    @app.get("/v1/scans/{scan_id}")
+    def get_scan_detail(scan_id: str) -> Dict[str, Any]:
+        scan = orch.get_scan(scan_id)
+        if scan is None:
+            raise HTTPException(status_code=404, detail=f"Scan run {scan_id!r} not found")
+        return scan
 
     return app
 

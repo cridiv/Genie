@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from discovery.models import DiscoverySeed
 from orchestrator import GenieOrchestrator, OrchestratedVerificationResponse
+from registry.pharmacies import NearbyPharmaciesResponse, find_nearby_pharmacies
 from verification.adapters import (
     MLInfraVerifyPayload,
     scan_input_from_ml_infra,
@@ -164,6 +165,28 @@ def create_app(orchestrator: Optional[GenieOrchestrator] = None) -> FastAPI:
         if scan is None:
             raise HTTPException(status_code=404, detail=f"Scan run {scan_id!r} not found")
         return scan
+
+    @app.get("/v1/pharmacies/nearby", response_model=NearbyPharmaciesResponse)
+    def get_nearby_pharmacies(
+        lat: Optional[float] = Query(default=None, ge=-90.0, le=90.0, description="User GPS latitude"),
+        lng: Optional[float] = Query(default=None, ge=-180.0, le=180.0, description="User GPS longitude"),
+        location: Optional[str] = Query(
+            default=None,
+            description="Optional area name (e.g. 'Victoria Island, Lagos', 'Wuse 2, Abuja')",
+        ),
+        radius_km: float = Query(default=15.0, ge=1.0, le=100.0),
+        limit: int = Query(default=8, ge=1, le=30),
+        verified_only: bool = Query(default=False, description="Return only PCN-verified pharmacies"),
+    ) -> NearbyPharmaciesResponse:
+        return find_nearby_pharmacies(
+            lat=lat,
+            lng=lng,
+            location=location,
+            radius_km=radius_km,
+            limit=limit,
+            verified_only=verified_only,
+            trusted_store=orch.trusted_store,
+        )
 
     return app
 

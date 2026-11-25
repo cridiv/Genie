@@ -54,6 +54,26 @@ export interface Pharmacy {
   verified: boolean;
   /** Product availability has been confirmed separately. */
   stockConfirmed: boolean;
+  latitude?: number;
+  longitude?: number;
+  googleMapsUrl?: string;
+  directionsUrl?: string;
+  phone?: string | null;
+  rating?: number | null;
+  ratingCount?: number | null;
+  pcnMatchedChain?: string | null;
+  source?: string;
+}
+
+export interface NearbyPharmaciesResponse {
+  queryLocation: string;
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  total: number;
+  verifiedCount: number;
+  source: string;
+  pharmacies: Pharmacy[];
 }
 
 export interface VerificationResult {

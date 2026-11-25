@@ -8,7 +8,7 @@ import pytest
 from genie.schemas.scan import ScanImage, ScanRequest
 from genie.schemas.verdict import VerdictState
 from genie.storage.object_store import LocalImageStorage
-from genie.storage.vector_store import InMemoryVectorStore
+from genie.storage.vector_store import InMemoryVectorStore, SQLiteVectorStore
 from genie.verification.pipeline import VerificationPipeline
 from genie.vision.pack_compare import PackComparator
 from genie.vision.reference_index import ReferencePackIndexer
@@ -216,3 +216,28 @@ async def test_pipeline_flags_fake_on_surface_texture_mismatch(tmp_path):
     assert res.verdict == VerdictState.SUSPICIOUS
     assert res.confidence >= 0.95
     assert "surface texture" in res.explanation.lower()
+
+
+@pytest.mark.asyncio
+async def test_sqlite_vector_store_cosine_search(tmp_path):
+    store = SQLiteVectorStore(db_path=tmp_path / "vectors.db")
+    await store.upsert(
+        id="ref-1",
+        vector=[1.0, 0.0, 0.0],
+        metadata={"brand_name": "GENIEMED", "gtin_list": ["06150000000012"], "nafdac_number": "B4-6458"},
+    )
+    await store.upsert(
+        id="ref-2",
+        vector=[0.0, 1.0, 0.0],
+        metadata={"brand_name": "OTHERMED", "gtin_list": ["06159999999999"], "nafdac_number": "A4-1111"},
+    )
+    assert await store.count() == 2
+
+    hits = await store.search([0.98, 0.1, 0.0], top_k=1)
+    assert len(hits) == 1
+    assert hits[0].id == "ref-1"
+    assert hits[0].score > 0.98
+
+    filtered = await store.search([0.5, 0.5, 0.0], top_k=1, filter_metadata={"gtin_list": "06159999999999"})
+    assert len(filtered) == 1
+    assert filtered[0].id == "ref-2"

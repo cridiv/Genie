@@ -1,8 +1,8 @@
 """Dependency injection for FastAPI stateless ML endpoints."""
-from genie.storage.vector_store import InMemoryVectorStore, VectorStore
+from genie.storage.vector_store import SQLiteVectorStore, VectorStore
 
-# In-memory vector store singleton for local runtime (swap with QdrantVectorStore in prod)
-_vector_store_instance = InMemoryVectorStore()
+# Persistent SQLite + NumPy cosine similarity vector store (no Qdrant required)
+_vector_store_instance = SQLiteVectorStore("./data/vectors.db")
 
 
 def get_vector_store() -> VectorStore:

@@ -1,0 +1,49 @@
+services:
+  genie-ai:
+    build:
+      context: ./genie-ai
+      dockerfile: Dockerfile
+    container_name: genie-ai
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file:
+      - path: ./genie-ai/.env
+        required: false
+    volumes:
+      - ./genie-ai/data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8001/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  ml-infra:
+    build:
+      context: ./ml_infra
+      dockerfile: Dockerfile
+    container_name: genie-ml-infra
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=production
+      - GENIE_AI_URL=http://genie-ai:8001
+      - GENIE_AI_TIMEOUT_SECONDS=10.0
+      - DATABASE_URL=sqlite+aiosqlite:///./data/genie.db
+    env_file:
+      - path: ./ml_infra/.env
+        required: false
+    volumes:
+      - ./ml_infra/data:/app/data
+      - ./genie-ai/data/products:/app/genie_ai_products:ro
+    depends_on:
+      genie-ai:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s

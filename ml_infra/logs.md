@@ -275,6 +275,13 @@ For any future change affecting the database (`src/genie/db/models.py`, Alembic 
     - Removed `postgres`, `pgvector`, `qdrant`, `asyncpg`, `sqlalchemy`, and `qdrant-client` from [`docker/docker-compose.yml`](docker/docker-compose.yml) and [`requirements.txt`](requirements.txt) in favor of SQLite (`aiosqlite` / `sqlite3`).
     - Database schema status: Zero PostgreSQL changes (`SQLiteVectorStore` uses local `./data/vectors.db`).
 
+24. **Cloud VM Deployment Optimization (2 GB RAM, 2 vCPU, 20 GB Storage) [2026-11-25]**:
+    - Converted `VerificationPipeline` and `ReferencePackIndexer` to lazy singletons in [`src/genie/api/deps.py`](src/genie/api/deps.py) and [`src/genie/api/v1/verify.py`](src/genie/api/v1/verify.py) so `RapidOCR` and ONNX models load once (~200–300 MB RAM) instead of per-request.
+    - Added `_cap_resolution(..., max_dim=1280)` in [`src/genie/verification/pipeline.py`](src/genie/verification/pipeline.py) and `cv2.setNumThreads(2)` in [`src/genie/api/main.py`](src/genie/api/main.py) to prevent memory spikes and thread oversubscription.
+    - Enabled SQLite WAL mode in [`src/genie/storage/vector_store.py`](src/genie/storage/vector_store.py).
+    - Stripped `build-essential`, `sqlalchemy`, `asyncpg`, `alembic`, and `[dev,storage]` extras from [`docker/Dockerfile.api`](docker/Dockerfile.api) and [`pyproject.toml`](pyproject.toml); configured `--workers 1 --limit-concurrency 10`, `mem_limit: 1536m`, `cpus: "1.8"`, `OMP/OPENBLAS/ORT` thread caps, and `MALLOC_ARENA_MAX=2` in [`docker/docker-compose.yml`](docker/docker-compose.yml) and [`.dockerignore`](.dockerignore).
+    - Database schema status: Zero database schema changes.
+
 ---
 
 ## 2. Database Changelog

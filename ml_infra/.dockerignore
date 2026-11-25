@@ -4,6 +4,10 @@ __pycache__
 .pytest_cache
 .env
 data
+images
+tests
+evaluation
+training
 *.db
 *.db-wal
 *.db-shm

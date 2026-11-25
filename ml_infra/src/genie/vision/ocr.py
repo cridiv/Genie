@@ -1,5 +1,6 @@
 """Packaging text extraction, regulatory NAFDAC parsing, and batch verification."""
 from dataclasses import dataclass, field
+import importlib
 import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -243,10 +244,10 @@ class PackagingOCR:
 
     def _run_ocr_engine(self, image_np: np.ndarray) -> List[str]:
         lines: List[str] = []
-        # 1. PaddleOCR
+        # 1. PaddleOCR (optional)
         try:
-            from paddleocr import PaddleOCR
-            ocr = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
+            paddleocr_mod = importlib.import_module("paddleocr")
+            ocr = paddleocr_mod.PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
             results = ocr.ocr(image_np, cls=True)
             if results and results[0]:
                 for line in results[0]:
@@ -271,20 +272,20 @@ class PackagingOCR:
         except Exception:
             pass
 
-        # 3. EasyOCR fallback
+        # 3. EasyOCR fallback (optional)
         try:
-            import easyocr
-            reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+            easyocr_mod = importlib.import_module("easyocr")
+            reader = easyocr_mod.Reader(["en"], gpu=False, verbose=False)
             res = reader.readtext(image_np, detail=0)
             if res:
                 return [str(t) for t in res if str(t).strip()]
         except Exception:
             pass
 
-        # 4. Tesseract fallback
+        # 4. Tesseract fallback (optional)
         try:
-            import pytesseract
-            txt = pytesseract.image_to_string(image_np)
+            pytesseract_mod = importlib.import_module("pytesseract")
+            txt = pytesseract_mod.image_to_string(image_np)
             extracted = [ln.strip() for ln in txt.splitlines() if ln.strip()]
             if extracted:
                 return extracted

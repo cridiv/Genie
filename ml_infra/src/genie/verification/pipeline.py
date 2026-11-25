@@ -84,14 +84,26 @@ class VerificationPipeline:
 
         return None, resolved.semantic_regions
 
+    @staticmethod
+    def _cap_resolution(img_np: np.ndarray, max_dim: int = 1280) -> np.ndarray:
+        """Downscales oversized smartphone images to cap peak RAM and CPU latency."""
+        h, w = img_np.shape[:2]
+        longest = max(h, w)
+        if longest <= max_dim:
+            return img_np
+        scale = max_dim / float(longest)
+        return cv2.resize(img_np, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
     async def verify_scan(self, request: ScanRequest) -> VerificationResponse:
         t0 = time.perf_counter()
 
-        # 1. Parse Image
+        # 1. Parse & Cap Image Resolution
         first_img = request.images[0]
         if first_img.image_bytes_base64:
             img_bytes = base64.b64decode(first_img.image_bytes_base64)
             img_np = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
+            if img_np is not None:
+                img_np = self._cap_resolution(img_np, max_dim=1280)
         else:
             img_np = np.zeros((512, 512, 3), dtype=np.uint8)
 

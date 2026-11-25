@@ -1,28 +1,30 @@
 FROM python:3.11-slim
 
+# Optimized for 2GB RAM, 2 vCPU, 20GB storage Cloud VM
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    OMP_NUM_THREADS=2 \
+    OPENBLAS_NUM_THREADS=2 \
+    ORT_INTRA_OP_NUM_THREADS=2 \
+    MALLOC_ARENA_MAX=2
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     libgl1 \
     libglib2.0-0 \
     libzbar0 \
     libdmtx0b \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md ./
-RUN pip install --upgrade pip && \
-    pip install ".[dev,storage]"
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir .
 
 COPY src/ ./src/
 COPY configs/ ./configs/
-COPY scripts/ ./scripts/
 
 EXPOSE 8000
 
-CMD ["uvicorn", "genie.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "genie.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--limit-concurrency", "10", "--timeout-keep-alive", "15"]

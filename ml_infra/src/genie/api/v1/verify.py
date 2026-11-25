@@ -6,10 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 import numpy as np
 from pydantic import BaseModel, Field
 
-from genie.api.deps import get_vector_store
+from genie.api.deps import get_indexer, get_pipeline
 from genie.schemas.scan import ScanRequest
 from genie.schemas.verdict import VerificationResponse
-from genie.storage.vector_store import VectorStore
 from genie.verification.pipeline import VerificationPipeline
 from genie.vision.reference_index import ReferencePackIndexer
 
@@ -43,21 +42,20 @@ class ReferenceIndexResponse(BaseModel):
 @router.post("/verify", response_model=VerificationResponse)
 async def verify_scan(
     request: ScanRequest,
-    vector_store: VectorStore = Depends(get_vector_store),
+    pipeline: VerificationPipeline = Depends(get_pipeline),
 ):
     """
     Stateless Genium verification endpoint.
     Accepts consumer scan images plus optional Backend-supplied candidate metadata/reference image,
-    executes full ML verification (<4s), and returns verdict, scores, and explanation for Backend persistence.
+    executes full ML verification (<4s latency budget), and returns verdict, scores, and explanation for Backend persistence.
     """
-    pipeline = VerificationPipeline(vector_store=vector_store)
     return await pipeline.verify_scan(request)
 
 
 @router.post("/reference/index", response_model=ReferenceIndexResponse)
 async def index_reference_pack(
     request: ReferenceIndexRequest,
-    vector_store: VectorStore = Depends(get_vector_store),
+    indexer: ReferencePackIndexer = Depends(get_indexer),
 ):
     """Indexes a canonical reference pack image into Object Storage and VectorStore."""
     img_bytes = base64.b64decode(request.image_bytes_base64)
@@ -68,7 +66,6 @@ async def index_reference_pack(
             detail="Invalid reference image payload",
         )
 
-    indexer = ReferencePackIndexer(vector_store=vector_store)
     indexed = await indexer.index_reference_pack(
         product_id=request.product_id,
         product_version_id=request.product_version_id,

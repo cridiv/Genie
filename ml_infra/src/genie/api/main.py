@@ -1,5 +1,6 @@
 """FastAPI application entrypoint for Genie Stateless ML Service."""
 from contextlib import asynccontextmanager
+import cv2
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,7 +13,8 @@ from genie.common.exceptions import QualityGateError
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize models and warm caches
+    # Cap OpenCV thread pool for 2-vCPU cloud VM efficiency
+    cv2.setNumThreads(2)
     yield
 
 

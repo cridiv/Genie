@@ -14,26 +14,36 @@
         "nafdac_number": null,
         "batch_number": null,
         "expiry_date": null,
-        "raw_text_lines": []
+        "raw_text_lines": [
+          "COUNTERFEITED/FAKE",
+          "daflon500mg",
+          "daflon500",
+          "film tablet",
+          "SihvrBlinierPack",
+          "0000O",
+          "00000",
+          "Fie\uff0815\uff09tbx+pach",
+          "Ten(H)TshktsssPack"
+        ]
       },
       "vlm_forensic_review": {
-        "score": 0.25,
-        "confidence": 0.95,
+        "score": 0.3,
+        "confidence": 0.9,
         "is_consistent": false,
         "triage_verdict": "Suspicious",
         "detected_nafdac": null,
         "detected_batch": null,
         "detected_expiry": null,
         "reasons": [
-          "Different country of origin labels (France vs Istanbul, Turkey)",
-          "Inconsistent blister pack designs and tablet counts (4x15 vs 6x10)",
-          "Missing NAFDAC registration number, batch, and expiry dates"
+          "Different country of origin labeling (France vs Istanbul, Turkey) on outer boxes",
+          "Mismatched blister pack designs (Silver only vs Silver and Blue)",
+          "Inconsistent tablet count per pack (15 vs 10) and pack count (4 vs 6)"
         ],
         "discrepancies": [
-          "Mismatched tablet count per pack (15 vs 10)",
-          "Different number of packs (4 vs 6) despite same total tablets",
-          "Varied visual design (color borders, background patterns)",
-          "Absence of required regulatory details (NAFDAC, lot, expiry)"
+          "Outer box color scheme and branding differ (blue/white vs plain white)",
+          "Label text varies (film tablet vs tablet)",
+          "Different blister pack designs and packaging materials",
+          "Mismatched tablet quantity per pack and number of packs"
         ]
       },
       "pipeline_result": {
@@ -54,75 +64,107 @@
             "Batch number and expiry date were not detected on the scanned face.",
             "No canonical reference pack image available in database for visual comparison.",
             "Product identity unresolved; packaging version history cannot be verified.",
-            "Label text mismatch: original 'daflon 500 mg' vs counterfeit 'daflon 500 mg film tablet'",
-            "Country of origin mismatch: France vs Turkey",
-            "Different blister pack designs and tablet counts per pack (15x4 vs 10x6) though total tablets same",
-            "Absence of regulatory seals or tamper-evident features on counterfeit packaging"
+            "Box color scheme and layout differ (blue/white vs plain white)",
+            "Text on counterfeit box includes 'film tablet' which is absent on original",
+            "Blister pack design and printed pattern differ (plain silver vs silver+blue)",
+            "Pack quantity description differs (15 tablets x 4 packs vs 10 tablets x 6 packs)",
+            "Absence of visible regulatory seals, tamper evidence, or printed batch/expiry information"
           ]
         },
-        "execution_time_ms": 16058.9
+        "execution_time_ms": 28578.05
       }
     },
     {
       "filename": "images (11).jpg",
       "resolution": "275x183",
       "quality_gate": {
-        "passed": false,
+        "passed": true,
         "blur_score": 4657.23,
-        "glare_ratio": 0.0829,
-        "guidance_codes": [
-          "REDUCE_GLARE"
-        ]
+        "glare_ratio": 0.0484,
+        "guidance_codes": []
       },
       "barcode": null,
       "ocr": {
         "nafdac_number": null,
         "batch_number": null,
         "expiry_date": null,
-        "raw_text_lines": []
+        "raw_text_lines": [
+          "XANAX",
+          "3",
+          "ofizes",
+          "Aiprazolamum",
+          "0.25mg"
+        ]
       },
       "vlm_forensic_review": {
         "score": 0.95,
-        "confidence": 0.92,
+        "confidence": 0.98,
         "is_consistent": true,
         "triage_verdict": "Consistent with genuine",
         "detected_nafdac": null,
         "detected_batch": null,
         "detected_expiry": null,
         "reasons": [
-          "Clear, sharp branding and dosage text with no smudging",
-          "Standard Pfizer logo and product layout consistent with genuine packaging",
-          "No visible tampering, torn labels, or handwritten markings"
+          "Clear, sharp printing of brand name, dosage, and manufacturer logo",
+          "No visible tampering signs such as torn labels, handwritten markings, or missing seals",
+          "Standard layout with outer carton and blister packs matching typical genuine packaging"
         ],
         "discrepancies": []
       },
       "pipeline_result": {
-        "verdict": "REJECTED_BY_QUALITY_GATE",
-        "error": "Image failed quality thresholds: REDUCE_GLARE",
-        "details": {
-          "guidance_codes": [
-            "REDUCE_GLARE"
+        "verdict": "Cannot verify",
+        "confidence": 0.25,
+        "matched_product_name": null,
+        "explanation": "Cannot verify scanned product at this time. Insufficient verifiable signals detected from uploaded scan.. Please ensure packaging is well-lit, glare-free, and re-scan the primary face.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.5,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC registration number not located by OCR.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified."
           ]
-        }
+        },
+        "execution_time_ms": 25907.68
       }
     },
     {
       "filename": "images (12).jpg",
       "resolution": "458x670",
       "quality_gate": {
-        "passed": false,
+        "passed": true,
         "blur_score": 26038.56,
-        "glare_ratio": 0.3378,
-        "guidance_codes": [
-          "REDUCE_GLARE"
-        ]
+        "glare_ratio": 0.0518,
+        "guidance_codes": []
       },
       "barcode": null,
       "ocr": {
         "nafdac_number": null,
         "batch_number": null,
         "expiry_date": null,
-        "raw_text_lines": []
+        "raw_text_lines": [
+          "10x10Gelules",
+          "Ampicillineand Cloxacillin",
+          "Capsules",
+          "BETACLOX",
+          "Storeinacooldryplace,awayfromdirectsunlight",
+          "Keepallmedicineoutofreachofchildren.",
+          "Dosage:asdirected bythephysician.",
+          "Read thepackinsertcarefuly",
+          "Batch.No,230701",
+          "MFgDate,07/2023",
+          "ExpDate07/2026",
+          "NAFDACREG.NO:A44724",
+          "MarketedBy",
+          "FREEVIEWPharmaceutical Company.,Ltd",
+          "128MccRd,NIGCalabar"
+        ]
       },
       "vlm_forensic_review": {
         "score": 0.95,
@@ -133,68 +175,97 @@
         "detected_batch": "230701",
         "detected_expiry": "07/2026",
         "reasons": [
-          "Label is intact with no tears, hand-drawn markings, or missing seals",
-          "Print is sharp and legible; layout follows standard pharmaceutical packaging format",
-          "NAFDAC registration number, batch number, and expiry date are present and plausible"
+          "Sharp, legible print with no smudging or hand-drawn markings",
+          "NAFDAC registration number present in expected format",
+          "Batch and expiry dates are plausible and correctly formatted"
         ],
         "discrepancies": []
       },
       "pipeline_result": {
-        "verdict": "REJECTED_BY_QUALITY_GATE",
-        "error": "Image failed quality thresholds: REDUCE_GLARE",
-        "details": {
-          "guidance_codes": [
-            "REDUCE_GLARE"
+        "verdict": "Cannot verify",
+        "confidence": 0.25,
+        "matched_product_name": null,
+        "explanation": "Cannot verify scanned product at this time. Insufficient verifiable signals detected from uploaded scan.. Please ensure packaging is well-lit, glare-free, and re-scan the primary face.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.5,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC number A44724 extracted, but no Greenbook registry reference was available to verify it.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified."
           ]
-        }
+        },
+        "execution_time_ms": 23811.07
       }
     },
     {
       "filename": "images (9).jpg",
       "resolution": "724x424",
       "quality_gate": {
-        "passed": false,
+        "passed": true,
         "blur_score": 942.78,
-        "glare_ratio": 0.2434,
-        "guidance_codes": [
-          "REDUCE_GLARE"
-        ]
+        "glare_ratio": 0.0025,
+        "guidance_codes": []
       },
       "barcode": null,
       "ocr": {
         "nafdac_number": null,
         "batch_number": null,
         "expiry_date": null,
-        "raw_text_lines": []
+        "raw_text_lines": [
+          "BNC.210526M-G.05/2024EXP.04(2026",
+          "MRPRSGOIO PERISTABS.IOAT"
+        ]
       },
       "vlm_forensic_review": {
-        "score": 0.6,
-        "confidence": 0.7,
+        "score": 0.45,
+        "confidence": 0.68,
         "is_consistent": false,
         "triage_verdict": "Suspicious",
         "detected_nafdac": null,
         "detected_batch": "210524M",
         "detected_expiry": "04/2026",
         "reasons": [
-          "Hand-drawn pen markings added after printing, suggesting possible alteration of batch/expiry information.",
-          "Red sticker covering part of the blister pack, indicating potential tampering or concealment.",
-          "No visible NAFDAC registration number, which is required for genuine Indian pharmaceutical packaging."
+          "Hand-drawn blue ink markings over printed text suggest post\u2011manufacturing alteration",
+          "Red rectangular sticker covering part of the blister indicates possible tampering or re\u2011labeling",
+          "Absence of a visible NAFDAC registration number on the visible portion"
         ],
         "discrepancies": [
-          "Hand-written ink markings on the blister pack",
-          "Red sticker covering printed area",
-          "Absence of NAFDAC registration number",
-          "Potential mismatch between printed and hand-written batch/expiry data"
+          "Hand-written pen markings on the blister",
+          "Red sticker covering label area",
+          "Potential mismatch between printed brand name and hand\u2011written details"
         ]
       },
       "pipeline_result": {
-        "verdict": "REJECTED_BY_QUALITY_GATE",
-        "error": "Image failed quality thresholds: REDUCE_GLARE",
-        "details": {
-          "guidance_codes": [
-            "REDUCE_GLARE"
+        "verdict": "Suspicious",
+        "confidence": 0.25,
+        "matched_product_name": null,
+        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Insufficient verifiable signals detected from uploaded scan.. Please report this scan to NAFDAC enforcement.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.5,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC registration number not located by OCR.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified.",
+            "Hand-drawn batch/expiry line in blue ink",
+            "Potential inconsistency between printed and handwritten information",
+            "Missing NAFDAC registration number on packaging"
           ]
-        }
+        },
+        "execution_time_ms": 27954.14
       }
     },
     {
@@ -208,49 +279,68 @@
       },
       "barcode": null,
       "ocr": {
-        "nafdac_number": null,
+        "nafdac_number": "B4-6458",
         "batch_number": null,
         "expiry_date": null,
-        "raw_text_lines": []
+        "raw_text_lines": [
+          "IBUMARTEM",
+          "IBUMARTEM",
+          "(Artemether 80 mg + Lumefantrine 480 mg Tablet",
+          "(Artemether80mg+Lumefantrine 480 mg Tablets)",
+          "(Comprimes d' artemether 80 mg + de lumefantrine 48",
+          "(Comprimes dartemether 80mg+ de lumefantrine 480 mg)",
+          "YD",
+          "028730023401610",
+          "C08039012030TEXTCDETO1393",
+          "Arreterlepaludisme rapidement",
+          "Arreter le paludisme rapidement",
+          "80mg",
+          "480mg",
+          "Stop malaria fast",
+          "NAFDACReg"
+        ]
       },
       "vlm_forensic_review": {
-        "score": 0.95,
-        "confidence": 0.98,
-        "is_consistent": true,
-        "triage_verdict": "Consistent with genuine",
+        "score": 0.75,
+        "confidence": 0.8,
+        "is_consistent": false,
+        "triage_verdict": "Suspicious",
         "detected_nafdac": "B4-6458",
-        "detected_batch": null,
+        "detected_batch": "028730023401610",
         "detected_expiry": null,
         "reasons": [
-          "Both boxes show identical branding, composition, manufacturer (IBU PHARMA NIGERIA LTD), and NAFDAC registration (B4-6458) with clear, sharp printing.",
-          "No visible tampering signs such as torn labels, hand-drawn markings, or missing regulatory seals are present.",
-          "Packaging layout matches expected outer (10 x 1 x 6) and inner (1 x 6) unit pack configuration, indicating normal multipack structure."
+          "Outer carton (left) shows 'NAFDAC Reg' without registration number, while inner pack (right) displays B4-6458",
+          "Expiry date is not visible on either package",
+          "Security sticker with additional codes present on inner pack but not on outer carton"
         ],
-        "discrepancies": []
+        "discrepancies": [
+          "Missing NAFDAC registration number on outer carton",
+          "Expiry date not displayed"
+        ]
       },
       "pipeline_result": {
         "verdict": "Suspicious",
-        "confidence": 0.7652,
+        "confidence": 0.25,
         "matched_product_name": null,
-        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Barcode not detected or unreadable.. Please report this scan to NAFDAC enforcement.",
+        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Insufficient verifiable signals detected from uploaded scan.. Please report this scan to NAFDAC enforcement.",
         "signals": {
           "barcode_score": 0.5,
-          "nafdac_score": 0.2,
+          "nafdac_score": 0.5,
           "batch_consistency_score": 0.5,
           "visual_similarity_score": 0.5,
           "patch_anomaly_score": null,
           "history_match_score": 0.5,
           "reasons": [
             "Barcode not detected or unreadable.",
-            "NAFDAC number B4-6458 not found in official Greenbook registry.",
+            "NAFDAC number B4-6458 extracted, but no Greenbook registry reference was available to verify it.",
             "Batch number and expiry date were not detected on the scanned face.",
             "No canonical reference pack image available in database for visual comparison.",
             "Product identity unresolved; packaging version history cannot be verified.",
-            "Left box's NAFDAC registration number is not displayed",
-            "No batch or expiry dates visible on either package"
+            "Outer pack (left) displays 'NAFDAC Reg' without registration number",
+            "No expiry date visible on either package"
           ]
         },
-        "execution_time_ms": 19455.05
+        "execution_time_ms": 54578.58
       }
     },
     {
@@ -278,13 +368,13 @@
         "detected_batch": null,
         "detected_expiry": null,
         "reasons": [
-          "Missing critical regulatory information (NAFDAC registration number, batch/lot number, expiry date)",
-          "No visible tampering signs (e.g., torn labels, hand-drawn markings) but insufficient data for full assessment",
-          "Layout appears generic with no distinctive manufacturer branding or unique packaging identifiers"
+          "Missing NAFDAC registration number, batch/lot number, and expiry date",
+          "No visible regulatory seals or tamper-evident features",
+          "Lack of standard pharmaceutical packaging identifiers"
         ],
         "discrepancies": [
-          "Absence of mandatory pharmaceutical labeling elements (NAFDAC, batch, expiry)",
-          "Lack of clear manufacturer identification or product-specific details"
+          "Absence of required regulatory information (NAFDAC, batch, expiry)",
+          "No manufacturer name or product-specific details visible"
         ]
       },
       "pipeline_result": {
@@ -307,7 +397,7 @@
             "Product identity unresolved; packaging version history cannot be verified."
           ]
         },
-        "execution_time_ms": 6339.54
+        "execution_time_ms": 19831.29
       }
     },
     {
@@ -324,10 +414,19 @@
         "nafdac_number": null,
         "batch_number": null,
         "expiry_date": null,
-        "raw_text_lines": []
+        "raw_text_lines": [
+          "35 kgs and above",
+          "KESSINGTON",
+          "KESARTEM",
+          "Weight:",
+          "Lumefantrine 480mg Tablets",
+          "Artemether 80 mg",
+          "For oral use only",
+          "1X6 Tablets"
+        ]
       },
       "vlm_forensic_review": {
-        "score": 0.3,
+        "score": 0.6,
         "confidence": 0.7,
         "is_consistent": false,
         "triage_verdict": "Suspicious",
@@ -335,13 +434,14 @@
         "detected_batch": null,
         "detected_expiry": null,
         "reasons": [
-          "Hand-drawn blue pen marking on packaging indicating possible tampering",
-          "Visible face lacks visible NAFDAC registration number, batch/lot number, and expiry date",
-          "Box edges show physical wear and possible alteration beyond standard manufacturing"
+          "Hand-drawn blue pen markings across the box indicating possible tampering or user annotation",
+          "Visible wear, torn edges and creasing suggesting handling or possible damage",
+          "Absence of required regulatory information such as NAFDAC registration number, batch/lot number, and expiry date"
         ],
         "discrepancies": [
-          "Hand-drawn blue pen marking",
-          "Absence of required regulatory information (NAFDAC, batch, expiry) on displayed face"
+          "Hand-drawn pen markings not part of original packaging design",
+          "Missing regulatory seals and required labeling information",
+          "Potential physical damage to packaging"
         ]
       },
       "pipeline_result": {
@@ -362,12 +462,11 @@
             "Batch number and expiry date were not detected on the scanned face.",
             "No canonical reference pack image available in database for visual comparison.",
             "Product identity unresolved; packaging version history cannot be verified.",
-            "Hand-drawn markings not part of original packaging design",
-            "Absence of mandatory regulatory information (NAFDAC, batch, expiry)",
-            "Possible alteration of packaging integrity through drawn lines"
+            "Hand-drawn markings",
+            "Absence of regulatory compliance details (NAFDAC, batch, expiry)"
           ]
         },
-        "execution_time_ms": 7085.98
+        "execution_time_ms": 33727.3
       }
     },
     {
@@ -381,47 +480,63 @@
       },
       "barcode": null,
       "ocr": {
-        "nafdac_number": null,
-        "batch_number": null,
+        "nafdac_number": "C4-0143",
+        "batch_number": "EXP",
         "expiry_date": null,
-        "raw_text_lines": []
+        "raw_text_lines": [
+          "\"Second dose to be takenafter8hrsof",
+          "KEEPOUTOFREACHOFCHILDREN",
+          "firstdose.Bettertakenwithfood",
+          "NAFDACReg.No.:C4-0143",
+          "\uff1a11/2024",
+          "\uff1a10/2027",
+          "OID:032910034202151",
+          "TEXTCODETO1393",
+          "Mfg.Lic.No.:G/25/875",
+          "JT663",
+          "Store at below30\u00b0C",
+          "especially fatty meals.\"",
+          "Protectfromlight.",
+          "Storage:",
+          "Mfg.Date"
+        ]
       },
       "vlm_forensic_review": {
         "score": 0.95,
-        "confidence": 0.9,
+        "confidence": 0.95,
         "is_consistent": true,
         "triage_verdict": "Consistent with genuine",
         "detected_nafdac": "C4-0143",
         "detected_batch": "JT663",
         "detected_expiry": "10/2027",
         "reasons": [
-          "Clear, sharp print quality with standard pharmaceutical layout and legible text",
-          "Valid regulatory details including NAFDAC Reg. No. C4-0143 and logical expiry date (10/2027)",
-          "No visible signs of tampering such as torn seals, hand-drawn markings, or missing regulatory stickers"
+          "Sharp, legible print with standard pharmaceutical layout including composition, dosage, and regulatory warnings",
+          "Valid NAFDAC registration number (C4-0143) and consistent 3-year expiry date (10/2027) from manufacturing date (11/2024)",
+          "Presence of anti-counterfeit text code verification system ('TEXT CODE TO 1393')"
         ],
         "discrepancies": []
       },
       "pipeline_result": {
-        "verdict": "Suspicious",
-        "confidence": 0.7652,
+        "verdict": "Cannot verify",
+        "confidence": 0.7329,
         "matched_product_name": null,
-        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Barcode not detected or unreadable.. Please report this scan to NAFDAC enforcement.",
+        "explanation": "Cannot verify scanned product at this time. Barcode not detected or unreadable.. Please ensure packaging is well-lit, glare-free, and re-scan the primary face.",
         "signals": {
           "barcode_score": 0.5,
-          "nafdac_score": 0.2,
-          "batch_consistency_score": 0.5,
+          "nafdac_score": 0.5,
+          "batch_consistency_score": 0.9,
           "visual_similarity_score": 0.5,
           "patch_anomaly_score": null,
           "history_match_score": 0.5,
           "reasons": [
             "Barcode not detected or unreadable.",
-            "NAFDAC number C4-0143 not found in official Greenbook registry.",
-            "Batch number and expiry date were not detected on the scanned face.",
+            "NAFDAC number C4-0143 extracted, but no Greenbook registry reference was available to verify it.",
+            "Batch and expiry specifications are consistent.",
             "No canonical reference pack image available in database for visual comparison.",
             "Product identity unresolved; packaging version history cannot be verified."
           ]
         },
-        "execution_time_ms": 25644.87
+        "execution_time_ms": 49459.24
       }
     }
   ],

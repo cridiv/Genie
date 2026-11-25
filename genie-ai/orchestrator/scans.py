@@ -46,6 +46,9 @@ class ScanStore:
                     confidence REAL NOT NULL,
                     coverage REAL NOT NULL,
                     reference_level TEXT NOT NULL,
+                    summary TEXT NOT NULL DEFAULT '',
+                    limitations_json TEXT NOT NULL DEFAULT '[]',
+                    counterfeit_tell_hits_json TEXT NOT NULL DEFAULT '[]',
                     discovery_job_id TEXT,
                     execution_time_ms REAL NOT NULL,
                     json_path TEXT NOT NULL,
@@ -53,6 +56,20 @@ class ScanStore:
                 )
                 """
             )
+            # Safe idempotent migration for existing SQLite databases
+            existing_cols = {
+                row["name"]
+                for row in conn.execute("PRAGMA table_info(verification_scans)").fetchall()
+            }
+            for col_name, col_def in (
+                ("summary", "TEXT NOT NULL DEFAULT ''"),
+                ("limitations_json", "TEXT NOT NULL DEFAULT '[]'"),
+                ("counterfeit_tell_hits_json", "TEXT NOT NULL DEFAULT '[]'"),
+            ):
+                if col_name not in existing_cols:
+                    conn.execute(
+                        f"ALTER TABLE verification_scans ADD COLUMN {col_name} {col_def}"
+                    )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_scans_created_at ON verification_scans(created_at DESC)"
             )
@@ -76,17 +93,27 @@ class ScanStore:
         confidence: float,
         coverage: float,
         reference_level: str,
+        summary: str = "",
+        limitations: Optional[List[str]] = None,
+        counterfeit_tell_hits: Optional[List[Dict[str, Any]]] = None,
         discovery_job_id: Optional[str],
         execution_time_ms: float,
         payload: Dict[str, Any],
     ) -> str:
-        """Persist scan metadata + full payload to SQLite WAL and `scans_dir/<scan_id>.json`."""
+        """Persist scan metadata + summary/limitations + full payload to SQLite WAL and JSON."""
         created_at = _utc_now_iso()
         json_file = self.scans_dir / f"{scan_id}.json"
+        lims = list(limitations or [])
+        hits = list(counterfeit_tell_hits or [])
+
         enriched_payload = dict(payload)
-        enriched_payload.setdefault("scan_id", scan_id)
-        enriched_payload.setdefault("created_at", created_at)
-        enriched_payload.setdefault("source_endpoint", source_endpoint)
+        enriched_payload["scan_id"] = scan_id
+        enriched_payload["scan_json_path"] = str(json_file)
+        enriched_payload["created_at"] = created_at
+        enriched_payload["source_endpoint"] = source_endpoint
+        enriched_payload["summary"] = summary
+        enriched_payload["limitations"] = lims
+        enriched_payload["counterfeit_tell_hits"] = hits
 
         serialized = json.dumps(enriched_payload, indent=2, default=str)
         tmp_file = json_file.with_suffix(".json.tmp")
@@ -99,8 +126,9 @@ class ScanStore:
                 INSERT OR REPLACE INTO verification_scans (
                     scan_id, created_at, source_endpoint, product_name, nafdac_number,
                     verdict, ml_infra_verdict, confidence, coverage, reference_level,
+                    summary, limitations_json, counterfeit_tell_hits_json,
                     discovery_job_id, execution_time_ms, json_path, payload_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     scan_id,
@@ -113,6 +141,9 @@ class ScanStore:
                     float(confidence),
                     float(coverage),
                     reference_level,
+                    summary,
+                    json.dumps(lims),
+                    json.dumps(hits, default=str),
                     discovery_job_id,
                     float(execution_time_ms),
                     str(json_file),
@@ -132,8 +163,17 @@ class ScanStore:
         json_file = self.scans_dir / f"{scan_id}.json"
         enriched_payload = dict(payload)
         enriched_payload["scan_id"] = scan_id
+        enriched_payload["scan_json_path"] = str(json_file)
         if source_endpoint:
             enriched_payload["source_endpoint"] = source_endpoint
+
+        ver_res = (enriched_payload.get("verification") or {}).get("result") or enriched_payload.get("result") or {}
+        if isinstance(ver_res, dict):
+            enriched_payload.setdefault("summary", ver_res.get("summary") or "")
+            enriched_payload.setdefault("limitations", ver_res.get("limitations") or [])
+            enriched_payload.setdefault(
+                "counterfeit_tell_hits", ver_res.get("counterfeit_tell_hits") or []
+            )
 
         serialized = json.dumps(enriched_payload, indent=2, default=str)
         tmp_file = json_file.with_suffix(".json.tmp")
@@ -194,6 +234,15 @@ class ScanStore:
 
     @staticmethod
     def _row_to_dict(row: sqlite3.Row, *, include_payload: bool) -> Dict[str, Any]:
+        try:
+            lims = json.loads(row["limitations_json"] or "[]")
+        except Exception:  # noqa: BLE001
+            lims = []
+        try:
+            hits = json.loads(row["counterfeit_tell_hits_json"] or "[]")
+        except Exception:  # noqa: BLE001
+            hits = []
+
         out: Dict[str, Any] = {
             "scan_id": row["scan_id"],
             "created_at": row["created_at"],
@@ -205,6 +254,9 @@ class ScanStore:
             "confidence": row["confidence"],
             "coverage": row["coverage"],
             "reference_level": row["reference_level"],
+            "summary": row["summary"],
+            "limitations": lims,
+            "counterfeit_tell_hits": hits,
             "discovery_job_id": row["discovery_job_id"],
             "execution_time_ms": row["execution_time_ms"],
             "json_path": row["json_path"],

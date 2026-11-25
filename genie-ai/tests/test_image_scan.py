@@ -134,7 +134,14 @@ class TestImageScan(unittest.TestCase):
                 self.assertIsNotNone(saved)
                 self.assertEqual(saved["source_endpoint"], "verify_image")
                 self.assertEqual(saved["verdict"], "authentic")
+                self.assertTrue(bool(saved["summary"]))
+                self.assertIsInstance(saved["limitations"], list)
+                self.assertIsInstance(saved["counterfeit_tell_hits"], list)
                 self.assertIn("extracted_scan", saved["payload"])
+                saved_json = json.loads(Path(resp.scan_json_path).read_text(encoding="utf-8"))
+                self.assertEqual(saved_json["scan_json_path"], resp.scan_json_path)
+                self.assertTrue(bool(saved_json["summary"]))
+                self.assertIsInstance(saved_json["limitations"], list)
             finally:
                 orch.shutdown(wait=False)
 

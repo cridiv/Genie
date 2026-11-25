@@ -15,14 +15,14 @@ import {
   ChevronLeftIcon,
   RefreshIcon,
 } from "@/components/ui/icons";
+import { verifyCapturedImage } from "@/lib/genie/api";
+import type { VerificationResult } from "@/lib/genie/types";
 import { inspectFrame, type ScanShots, type ScanSide } from "@/lib/scan/frame";
 import { rememberShots } from "@/lib/scan/shots";
 
 type Step = ScanSide | "analysing" | "done" | "error";
 
 const EMPTY_SHOTS: ScanShots = { front: null, back: null };
-
-const VERIFY_MS = 2600;
 
 function progressFor(step: Step, failed: ScanSide | null) {
   if (step === "front") return 1;
@@ -35,18 +35,49 @@ export default function ScanPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("front");
   const [shots, setShots] = useState<ScanShots>(EMPTY_SHOTS);
-  const [rejected, setRejected] = useState<{ side: ScanSide; shot: string } | null>(
-    null,
-  );
+  const [rejected, setRejected] = useState<{
+    side: ScanSide;
+    shot: string;
+    message?: string;
+  } | null>(null);
+  const [liveResult, setLiveResult] = useState<VerificationResult | null>(null);
   const busy = useRef(false);
 
   const side: ScanSide | null = step === "front" || step === "back" ? step : null;
 
   useEffect(() => {
     if (step !== "analysing") return;
-    const timer = window.setTimeout(() => setStep("done"), VERIFY_MS);
-    return () => window.clearTimeout(timer);
-  }, [step]);
+    const primaryShot = shots.front || shots.back;
+    if (!primaryShot) {
+      setStep("front");
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await verifyCapturedImage(primaryShot);
+        if (cancelled) return;
+        setLiveResult(res);
+        setStep("done");
+      } catch (err) {
+        if (cancelled) return;
+        setRejected({
+          side: "front",
+          shot: primaryShot,
+          message:
+            err instanceof Error
+              ? err.message
+              : "Could not reach verification server. Please retry.",
+        });
+        setStep("error");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step, shots.front, shots.back]);
 
   async function handleFrame(dataUrl: string) {
     if (busy.current) return;
@@ -58,7 +89,7 @@ export default function ScanPage() {
       const readable = await inspectFrame(dataUrl);
 
       if (!readable) {
-        setRejected({ side: from, shot: dataUrl });
+        setRejected({ side: from, shot: dataUrl, message: "Image unclear" });
         setStep("error");
         return;
       }
@@ -73,11 +104,13 @@ export default function ScanPage() {
   function retry() {
     const from = rejected?.side ?? "front";
     setRejected(null);
+    setLiveResult(null);
     setStep(from);
   }
 
   function restart() {
     setRejected(null);
+    setLiveResult(null);
     setShots(EMPTY_SHOTS);
     setStep("front");
   }
@@ -141,10 +174,12 @@ export default function ScanPage() {
               >
                 <DoneScreen
                   shots={shots}
+                  productName={liveResult?.matchedProduct?.brandName}
                   onView={() => {
                     rememberShots(shots);
                     startRouteProgress();
-                    router.push("/result/authentic");
+                    const targetId = liveResult?.id || "authentic";
+                    router.push(`/result/${encodeURIComponent(targetId)}`);
                   }}
                   onAgain={restart}
                 />
@@ -158,7 +193,11 @@ export default function ScanPage() {
                 transition={{ duration: 0.26, ease: "easeOut" }}
                 className="flex flex-1 flex-col"
               >
-                <ErrorScreen shot={rejected.shot} onRetry={retry} />
+                <ErrorScreen
+                  shot={rejected.shot}
+                  message={rejected.message}
+                  onRetry={retry}
+                />
               </motion.div>
             ) : null}
           </AnimatePresence>
@@ -214,17 +253,24 @@ function AnalysingScreen({ shots }: { shots: ScanShots }) {
         </div>
       </div>
 
-      <h1 className="font-display text-2xl font-bold tracking-tight">Verifying</h1>
+      <div className="text-center">
+        <h1 className="font-display text-2xl font-bold tracking-tight">Verifying</h1>
+        <p className="mt-1 text-xs text-muted">
+          Checking NAFDAC registry, packaging references &amp; recalls…
+        </p>
+      </div>
     </div>
   );
 }
 
 function DoneScreen({
   shots,
+  productName,
   onView,
   onAgain,
 }: {
   shots: ScanShots;
+  productName?: string;
   onView: () => void;
   onAgain: () => void;
 }) {
@@ -242,9 +288,14 @@ function DoneScreen({
         </motion.span>
       </div>
 
-      <h1 className="font-display text-3xl font-bold leading-tight tracking-tight">
-        Product verified
-      </h1>
+      <div>
+        <h1 className="font-display text-3xl font-bold leading-tight tracking-tight">
+          Scan complete
+        </h1>
+        {productName && (
+          <p className="mt-1 text-sm text-muted">{productName}</p>
+        )}
+      </div>
 
       <div className="flex items-center gap-2">
         {shots.front && (
@@ -281,9 +332,11 @@ function DoneScreen({
 
 function ErrorScreen({
   shot,
+  message,
   onRetry,
 }: {
   shot: string;
+  message?: string;
   onRetry: () => void;
 }) {
   return (
@@ -299,9 +352,14 @@ function ErrorScreen({
         </span>
       </div>
 
-      <h1 className="font-display text-2xl font-bold tracking-tight">
-        Image unclear
-      </h1>
+      <div className="max-w-xs">
+        <h1 className="font-display text-2xl font-bold tracking-tight">
+          {message && message !== "Image unclear" ? "Verification failed" : "Image unclear"}
+        </h1>
+        {message && message !== "Image unclear" && (
+          <p className="mt-1.5 text-xs text-muted">{message}</p>
+        )}
+      </div>
 
       <Button
         onClick={onRetry}

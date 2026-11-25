@@ -26,23 +26,23 @@ type Action = {
 
 const actions: Action[] = [
   { label: "Scan product", icon: ScanIcon, primary: true },
-  { label: "View verified pharmacy", icon: StoreIcon },
-  { label: "View verifiable products", icon: ShieldCheckIcon },
+  { label: "Verified pharmacy", icon: StoreIcon },
+  { label: "Verified products", icon: ShieldCheckIcon },
 ];
 
 const list: Variants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.075, delayChildren: 0.08 } },
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.06 } },
 };
 
 const item: Variants = {
-  hidden: (dir: number) => ({ opacity: 0, y: 26, skewX: 14 * dir, scale: 0.9 }),
+  hidden: (dir: number) => ({ opacity: 0, y: 22, skewX: 12 * dir, scale: 0.94 }),
   show: (dir: number) => ({
     opacity: 1,
     y: 0,
-    skewX: 6 * dir,
+    skewX: 3.5 * dir,
     scale: 1,
-    transition: { type: "spring", stiffness: 380, damping: 15, mass: 0.9 },
+    transition: { type: "spring", stiffness: 340, damping: 18, mass: 0.9 },
   }),
 };
 
@@ -55,7 +55,7 @@ const startExit: TargetAndTransition = {
 };
 
 const floatTransition = (index: number): Transition => ({
-  duration: 3.2 + index * 0.25,
+  duration: 3.4 + index * 0.3,
   repeat: Infinity,
   ease: "easeInOut",
   delay: 0.7 + index * 0.12,
@@ -66,7 +66,7 @@ export function HeroActions() {
   const reduced = useReducedMotion();
 
   return (
-    <div className="flex w-full max-w-[340px] flex-col items-center">
+    <div className="flex w-full flex-col items-center">
       <AnimatePresence mode="wait">
         {open ? (
           <motion.div
@@ -78,25 +78,20 @@ export function HeroActions() {
           >
             {actions.map((action, index) => {
               const Icon = action.icon;
-              // Alternate the lean so neighbouring pills tilt away from each other.
+              // Alternate the lean so each row tips the opposite way to its neighbour.
               const skew = reduced ? 0 : index % 2 === 0 ? -1 : 1;
 
               return (
-                <motion.div
-                  key={action.label}
-                  variants={item}
-                  custom={skew}
-                  className="w-full"
-                >
+                <motion.div key={action.label} variants={item} custom={skew}>
                   <motion.div
-                    animate={reduced ? undefined : { y: [0, -4, 0] }}
+                    animate={reduced ? undefined : { y: [0, -3, 0] }}
                     transition={reduced ? undefined : floatTransition(index)}
                   >
                     <Button
                       className={
                         action.primary
-                          ? "flex h-14 w-full items-center gap-3 rounded-pill bg-accent pl-2 pr-5 text-[15px] font-semibold text-accent-ink transition-transform duration-200 ease-out active:scale-[0.97]"
-                          : "flex h-14 w-full items-center gap-3 rounded-pill border border-line bg-surface pl-2 pr-5 text-[15px] font-semibold text-fg transition-transform duration-200 ease-out active:scale-[0.97]"
+                          ? "flex h-14 w-full items-center gap-3 rounded-pill bg-accent pl-2 pr-4 text-accent-ink transition-transform duration-200 ease-out active:scale-[0.98]"
+                          : "flex h-14 w-full items-center gap-3 rounded-pill border border-line bg-surface pl-2 pr-4 text-fg transition-transform duration-200 ease-out active:scale-[0.98]"
                       }
                     >
                       <span
@@ -106,13 +101,15 @@ export function HeroActions() {
                             : "flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-card text-accent"
                         }
                       >
-                        <Icon className="h-5 w-5" />
+                        <Icon className="h-[18px] w-[18px]" />
                       </span>
-                      <span className="flex-1 text-left">{action.label}</span>
+                      <span className="flex-1 truncate text-left text-sm font-semibold tracking-tight">
+                        {action.label}
+                      </span>
                       <ArrowRightIcon
                         className={
                           action.primary
-                            ? "h-4 w-4 shrink-0 text-ink/45"
+                            ? "h-4 w-4 shrink-0 text-accent-ink/60"
                             : "h-4 w-4 shrink-0 text-muted"
                         }
                       />

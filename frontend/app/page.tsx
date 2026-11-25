@@ -7,7 +7,7 @@ import { ScanIcon, SparkleIcon, StoreIcon } from "@/components/ui/icons";
 
 export default function HomePage() {
   return (
-    <>
+    <div className="max-h-screen">
       <div className="pointer-events-none fixed inset-0 z-0">
         <DotGrid
           dotSize={4}
@@ -60,13 +60,7 @@ export default function HomePage() {
             </Button>
           </div>
         </div>
-
-        <div className="mt-4 flex items-center justify-center">
-          <span className="flex h-9 w-9 items-center justify-center rounded-pill bg-accent text-accent-ink">
-            <SparkleIcon className="h-4 w-4" />
-          </span>
-        </div>
       </footer>
-    </>
+    </div>
   );
 }

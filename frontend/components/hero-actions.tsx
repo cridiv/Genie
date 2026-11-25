@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { ComponentType } from "react";
 import {
@@ -20,14 +21,15 @@ import {
 
 type Action = {
   label: string;
+  href: string;
   icon: ComponentType<{ className?: string }>;
   primary?: boolean;
 };
 
 const actions: Action[] = [
-  { label: "Scan product", icon: ScanIcon, primary: true },
-  { label: "Verified pharmacy", icon: StoreIcon },
-  { label: "Verified products", icon: ShieldCheckIcon },
+  { label: "Scan product", href: "/scan", icon: ScanIcon, primary: true },
+  { label: "Verified pharmacy", href: "/pharmacies", icon: StoreIcon },
+  { label: "Verified products", href: "/history", icon: ShieldCheckIcon },
 ];
 
 const list: Variants = {
@@ -87,7 +89,8 @@ export function HeroActions() {
                     animate={reduced ? undefined : { y: [0, -3, 0] }}
                     transition={reduced ? undefined : floatTransition(index)}
                   >
-                    <Button
+                    <Link
+                      href={action.href}
                       className={
                         action.primary
                           ? "flex h-14 w-full items-center gap-3 rounded-pill bg-accent pl-2 pr-4 text-accent-ink transition-transform duration-200 ease-out active:scale-[0.98]"
@@ -113,7 +116,7 @@ export function HeroActions() {
                             : "h-4 w-4 shrink-0 text-muted"
                         }
                       />
-                    </Button>
+                    </Link>
                   </motion.div>
                 </motion.div>
               );

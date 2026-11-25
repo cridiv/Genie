@@ -187,3 +187,22 @@ export function BarcodeIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function ImageIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <rect x="3" y="4.5" width="18" height="15" rx="3.5" />
+      <circle cx="8.5" cy="10" r="1.5" />
+      <path d="m4.5 16.6 4.2-4.2 3.3 3.3 2.6-2.6 5 5" />
+    </svg>
+  );
+}
+
+export function RefreshIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" />
+      <path d="M20.5 4.5v6h-6" />
+    </svg>
+  );
+}

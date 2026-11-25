@@ -1,172 +1,313 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Screen } from "@/components/app/screen";
-import { Badge } from "@/components/ui/badge";
+import { AnimatePresence, motion } from "framer-motion";
+import { Button } from "@ui-sdk/react/button";
+import { startRouteProgress } from "@/components/app/route-progress";
+import { ScanCamera } from "@/components/scan/scan-camera";
+import { Shot } from "@/components/scan/shot";
+import { StepBar } from "@/components/scan/step-bar";
 import {
-  CameraIcon,
+  AlertIcon,
+  ArrowRightIcon,
+  CheckIcon,
   ChevronLeftIcon,
-  ScanIcon,
+  RefreshIcon,
 } from "@/components/ui/icons";
-import { PillButton } from "@/components/ui/pill";
-import { cn } from "@/lib/cn";
-import { SCENARIO_OPTIONS } from "@/lib/genie/mock";
-import type { Scenario } from "@/lib/genie/types";
+import { inspectFrame, type ScanShots, type ScanSide } from "@/lib/scan/frame";
 
-const CORNERS = [
-  "left-5 top-5 rounded-tl-2xl border-l-2 border-t-2",
-  "right-5 top-5 rounded-tr-2xl border-r-2 border-t-2",
-  "bottom-5 left-5 rounded-bl-2xl border-b-2 border-l-2",
-  "bottom-5 right-5 rounded-br-2xl border-b-2 border-r-2",
-];
+type Step = ScanSide | "analysing" | "done" | "error";
+
+const EMPTY_SHOTS: ScanShots = { front: null, back: null };
+
+const VERIFY_MS = 2600;
+
+function progressFor(step: Step, failed: ScanSide | null) {
+  if (step === "front") return 1;
+  if (step === "back") return 2;
+  if (step === "error") return failed === "back" ? 2 : 1;
+  return 3;
+}
 
 export default function ScanPage() {
   const router = useRouter();
-  const [scenario, setScenario] = useState<Scenario>("authentic");
-  const [mode, setMode] = useState<"camera" | "code">("camera");
-  const [scanning, setScanning] = useState(false);
+  const [step, setStep] = useState<Step>("front");
+  const [shots, setShots] = useState<ScanShots>(EMPTY_SHOTS);
+  const [rejected, setRejected] = useState<{ side: ScanSide; shot: string } | null>(
+    null,
+  );
+  const busy = useRef(false);
 
-  function runCheck() {
-    if (scanning) return;
-    setScanning(true);
-    window.setTimeout(() => router.push(`/result/${scenario}`), 1800);
+  const side: ScanSide | null = step === "front" || step === "back" ? step : null;
+
+  useEffect(() => {
+    if (step !== "analysing") return;
+    const timer = window.setTimeout(() => setStep("done"), VERIFY_MS);
+    return () => window.clearTimeout(timer);
+  }, [step]);
+
+  async function handleFrame(dataUrl: string) {
+    if (busy.current) return;
+    busy.current = true;
+
+    const from: ScanSide = step === "back" ? "back" : "front";
+
+    try {
+      const readable = await inspectFrame(dataUrl);
+
+      if (!readable) {
+        setRejected({ side: from, shot: dataUrl });
+        setStep("error");
+        return;
+      }
+
+      setShots((previous) => ({ ...previous, [from]: dataUrl }));
+      setStep(from === "back" ? "analysing" : "back");
+    } finally {
+      busy.current = false;
+    }
+  }
+
+  function retry() {
+    const from = rejected?.side ?? "front";
+    setRejected(null);
+    setStep(from);
+  }
+
+  function restart() {
+    setRejected(null);
+    setShots(EMPTY_SHOTS);
+    setStep("front");
+  }
+
+  function goBack() {
+    if (step === "back") {
+      setStep("front");
+      return;
+    }
+    startRouteProgress();
+    router.push("/");
   }
 
   return (
-    <Screen className="gap-6">
-      <header className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          aria-label="Go back"
-          className="flex h-10 w-10 items-center justify-center rounded-pill border border-line bg-card transition active:scale-95"
-        >
-          <ChevronLeftIcon />
-        </button>
-        <p className="text-sm font-semibold">Scan product</p>
-        <span className="h-10 w-10" aria-hidden />
-      </header>
-
-      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-card border border-line bg-surface">
-        {CORNERS.map((corner) => (
-          <span
-            key={corner}
-            className={cn("absolute h-9 w-9 border-accent/70", corner)}
-          />
-        ))}
-
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div
-            className={cn(
-              "flex h-28 w-24 flex-col items-center justify-center gap-2 rounded-[20px] border-2 border-dashed bg-card transition-colors",
-              scanning ? "border-accent" : "border-line",
-            )}
+    <main className="flex min-h-dvh flex-col gap-4 bg-ink px-4">
+      <header className="flex items-center gap-3 pt-[max(1rem,env(safe-area-inset-top))]">
+        {step === "analysing" ? (
+          <span className="h-11 w-11 shrink-0" aria-hidden />
+        ) : (
+          <Button
+            aria-label="Go back"
+            onClick={goBack}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill border border-line bg-surface text-fg transition-transform duration-150 ease-out active:scale-95"
           >
-            <ScanIcon className="h-8 w-8 text-muted" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
-              pack
-            </span>
-          </div>
-        </div>
-
-        {scanning && (
-          <div className="animate-scanline absolute inset-x-8 top-[16%] h-1 rounded-pill bg-accent" />
+            <ChevronLeftIcon className="h-5 w-5" />
+          </Button>
         )}
 
-        <div className="absolute inset-x-0 bottom-0 flex justify-center p-5">
-          <Badge tone={scanning ? "accent" : "muted"} dot>
-            {scanning ? "Analyzing 5 signals…" : "Align the pack inside the frame"}
-          </Badge>
-        </div>
-      </div>
-
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-            Demo scenario
-          </p>
-          <span className="text-[11px] text-muted">simulated</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          {SCENARIO_OPTIONS.map((option) => {
-            const active = scenario === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                disabled={scanning}
-                onClick={() => setScenario(option.id)}
-                className={cn(
-                  "rounded-pill border px-4 py-3 text-left transition active:scale-[0.98] disabled:opacity-60",
-                  active
-                    ? "border-accent bg-accent/10"
-                    : "border-line bg-card",
-                )}
-              >
-                <span
-                  className={cn(
-                    "block text-sm font-semibold",
-                    active ? "text-accent" : "text-fg",
-                  )}
-                >
-                  {option.label}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] text-muted">
-                  {option.hint}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {mode === "camera" ? (
-        <div className="flex flex-col gap-2">
-          <PillButton
-            size="lg"
-            className="w-full"
-            onClick={runCheck}
-            disabled={scanning}
-          >
-            <CameraIcon className="h-5 w-5" />
-            {scanning ? "Reading pack…" : "Capture"}
-          </PillButton>
-          <PillButton
-            variant="ghost"
-            size="sm"
-            onClick={() => setMode("code")}
-            disabled={scanning}
-          >
-            Enter a code instead
-          </PillButton>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          <input
-            inputMode="text"
-            autoComplete="off"
-            placeholder="04-1928 or 5000456051231"
-            className="h-14 w-full rounded-pill border border-line bg-card px-5 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent"
+        <div className="flex flex-1 items-center rounded-pill border border-line bg-surface px-4 py-3.5">
+          <StepBar
+            progress={progressFor(step, rejected?.side ?? null)}
+            slow={step === "analysing"}
           />
-          <PillButton
-            size="lg"
-            className="w-full"
-            onClick={runCheck}
-            disabled={scanning}
-          >
-            {scanning ? "Checking…" : "Check product"}
-          </PillButton>
-          <PillButton
-            variant="ghost"
-            size="sm"
-            onClick={() => setMode("camera")}
-            disabled={scanning}
-          >
-            Use the camera
-          </PillButton>
+        </div>
+      </header>
+
+      {side ? (
+        <ScanCamera side={side} shots={shots} onFrame={handleFrame} />
+      ) : (
+        <div className="flex flex-1 flex-col">
+          <AnimatePresence mode="wait">
+            {step === "analysing" ? (
+              <motion.div
+                key="analysing"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -14 }}
+                transition={{ duration: 0.26, ease: "easeOut" }}
+                className="flex flex-1 flex-col"
+              >
+                <AnalysingScreen shots={shots} />
+              </motion.div>
+            ) : step === "done" ? (
+              <motion.div
+                key="done"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -14 }}
+                transition={{ duration: 0.26, ease: "easeOut" }}
+                className="flex flex-1 flex-col"
+              >
+                <DoneScreen
+                  shots={shots}
+                  onView={() => {
+                    startRouteProgress();
+                    router.push("/result/authentic");
+                  }}
+                  onAgain={restart}
+                />
+              </motion.div>
+            ) : rejected ? (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -14 }}
+                transition={{ duration: 0.26, ease: "easeOut" }}
+                className="flex flex-1 flex-col"
+              >
+                <ErrorScreen shot={rejected.shot} onRetry={retry} />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
       )}
-    </Screen>
+    </main>
+  );
+}
+
+function AnalysingScreen({ shots }: { shots: ScanShots }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-8">
+      <div className="relative flex h-44 w-44 items-center justify-center">
+        <svg
+          viewBox="0 0 100 100"
+          aria-hidden
+          className="absolute inset-0 h-full w-full animate-spin motion-reduce:animate-none"
+          style={{ animationDuration: "2.8s" }}
+        >
+          <circle
+            cx="50"
+            cy="50"
+            r="45"
+            fill="none"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray="78 205"
+            className="stroke-accent"
+          />
+        </svg>
+
+        <div className="flex items-center gap-2">
+          {shots.front && (
+            <motion.div
+              initial={{ opacity: 0, x: 12, rotate: -12 }}
+              animate={{ opacity: 1, x: 0, rotate: -6 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="h-20 w-16 overflow-hidden rounded-[14px] border border-line"
+            >
+              <Shot src={shots.front} />
+            </motion.div>
+          )}
+          {shots.back && (
+            <motion.div
+              initial={{ opacity: 0, x: -12, rotate: 12 }}
+              animate={{ opacity: 1, x: 0, rotate: 6 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="h-20 w-16 overflow-hidden rounded-[14px] border border-line"
+            >
+              <Shot src={shots.back} />
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      <h1 className="font-display text-2xl font-bold tracking-tight">Verifying</h1>
+    </div>
+  );
+}
+
+function DoneScreen({
+  shots,
+  onView,
+  onAgain,
+}: {
+  shots: ScanShots;
+  onView: () => void;
+  onAgain: () => void;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+      <div className="relative flex h-28 w-28 items-center justify-center">
+        <span className="absolute inset-0 rounded-pill bg-accent/20 animate-ping-slow" />
+        <motion.span
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 320, damping: 15 }}
+          className="relative flex h-20 w-20 items-center justify-center rounded-pill bg-accent text-accent-ink"
+        >
+          <CheckIcon className="h-9 w-9" />
+        </motion.span>
+      </div>
+
+      <h1 className="font-display text-3xl font-bold leading-tight tracking-tight">
+        Product verified
+      </h1>
+
+      <div className="flex items-center gap-2">
+        {shots.front && (
+          <div className="h-16 w-14 overflow-hidden rounded-[14px] border border-line">
+            <Shot src={shots.front} />
+          </div>
+        )}
+        {shots.back && (
+          <div className="h-16 w-14 overflow-hidden rounded-[14px] border border-line">
+            <Shot src={shots.back} />
+          </div>
+        )}
+      </div>
+
+      <div className="flex w-full max-w-[300px] flex-col items-center gap-1.5">
+        <Button
+          onClick={onView}
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-pill bg-accent text-base font-semibold text-accent-ink transition-transform duration-150 ease-out active:scale-[0.98]"
+        >
+          View results
+          <ArrowRightIcon className="h-4 w-4" />
+        </Button>
+
+        <Button
+          onClick={onAgain}
+          className="rounded-pill px-4 py-2 text-sm font-semibold text-muted transition-opacity duration-150 active:opacity-60"
+        >
+          Scan again
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ErrorScreen({
+  shot,
+  onRetry,
+}: {
+  shot: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+      <div className="relative h-32 w-28">
+        <div className="h-full w-full overflow-hidden rounded-[22px] border border-line opacity-40">
+          <Shot src={shot} />
+        </div>
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-pill bg-warn text-ink">
+            <AlertIcon className="h-5 w-5" />
+          </span>
+        </span>
+      </div>
+
+      <h1 className="font-display text-2xl font-bold tracking-tight">
+        Image unclear
+      </h1>
+
+      <Button
+        onClick={onRetry}
+        className="flex h-14 w-full max-w-[300px] items-center justify-center gap-2 rounded-pill bg-accent text-base font-semibold text-accent-ink transition-transform duration-150 ease-out active:scale-[0.98]"
+      >
+        <RefreshIcon className="h-4 w-4" />
+        Retry
+      </Button>
+    </div>
   );
 }

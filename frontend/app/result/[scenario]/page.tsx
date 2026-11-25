@@ -23,6 +23,11 @@ function isScenario(value: string): value is Scenario {
   return (SCENARIO_VALUES as string[]).includes(value);
 }
 
+// The entire page is derived from the route param, so this segment is allowed
+// to block the navigation instead of splitting into a Suspense boundary that
+// would only ever show a fallback.
+export const instant = false;
+
 export function generateStaticParams() {
   return SCENARIO_VALUES.map((scenario) => ({ scenario }));
 }

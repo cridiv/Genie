@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { Suspense } from "react";
 import "./globals.css";
+import { RouteProgress } from "@/components/app/route-progress";
 import { RegisterServiceWorker } from "@/components/pwa/register-sw";
 
 const bricolage = localFont({
@@ -62,6 +64,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-dvh">
         <RegisterServiceWorker />
+        <Suspense fallback={null}>
+          <RouteProgress />
+        </Suspense>
         <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col">
           {children}
         </div>

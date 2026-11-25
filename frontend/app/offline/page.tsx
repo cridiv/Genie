@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Screen } from "@/components/app/screen";
-import { SparkleIcon } from "@/components/ui/icons";
+import { LogoMark } from "@/components/ui/logo";
 import { PillLink } from "@/components/ui/pill";
 
 export const metadata: Metadata = { title: "Offline" };
@@ -9,7 +9,7 @@ export default function OfflinePage() {
   return (
     <Screen className="items-center justify-center text-center">
       <span className="flex h-16 w-16 items-center justify-center rounded-pill bg-accent text-accent-ink">
-        <SparkleIcon className="h-8 w-8" />
+        <LogoMark className="h-9 w-9" />
       </span>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">You&apos;re offline</h1>

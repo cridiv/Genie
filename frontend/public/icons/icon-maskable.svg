@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Genie">
-  <rect width="512" height="512" fill="#0b0e13"/>
-  <circle cx="256" cy="256" r="118" fill="#c8f65a"/>
-  <path d="M256 170c8 58 34 84 92 92-58 8-84 34-92 92-8-58-34-84-92-92 58-8 84-34 92-92z" fill="#0b0e13"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Genium">
+<rect width="512" height="512" fill="#0b0e13"/>
+<rect x="136.38" y="108.83" width="147.84" height="181.44" rx="52.42" fill="#566a2f" transform="rotate(-12 210.3 199.55)"/>
+<rect x="227.78" y="221.73" width="147.84" height="181.44" rx="52.42" fill="#c8f65a" transform="rotate(-12 301.7 312.45)"/>
 </svg>

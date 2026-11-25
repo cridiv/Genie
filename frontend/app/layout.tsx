@@ -30,22 +30,33 @@ const dmSans = localFont({
 });
 
 export const metadata: Metadata = {
-  applicationName: "Genie",
+  applicationName: "Genium",
   title: {
-    default: "Genie — Verify before you buy",
-    template: "%s · Genie",
+    default: "Genium — Verify before you buy",
+    template: "%s · Genium",
   },
   description:
     "Scan medicines and consumables to check authenticity and find verified pharmacies nearby.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Genie",
+    title: "Genium",
   },
   formatDetection: { telephone: false },
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/icons/icon.svg",
-    apple: "/icons/icon.svg",
+    icon: [
+      { url: "/icons/icon.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icons/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [
+      {
+        url: "/icons/apple-touch-icon.png",
+        type: "image/png",
+        sizes: "180x180",
+      },
+    ],
   },
 };
 

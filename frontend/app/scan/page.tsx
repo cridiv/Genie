@@ -16,6 +16,7 @@ import {
   RefreshIcon,
 } from "@/components/ui/icons";
 import { inspectFrame, type ScanShots, type ScanSide } from "@/lib/scan/frame";
+import { rememberShots } from "@/lib/scan/shots";
 
 type Step = ScanSide | "analysing" | "done" | "error";
 
@@ -141,6 +142,7 @@ export default function ScanPage() {
                 <DoneScreen
                   shots={shots}
                   onView={() => {
+                    rememberShots(shots);
                     startRouteProgress();
                     router.push("/result/authentic");
                   }}

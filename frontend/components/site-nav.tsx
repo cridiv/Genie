@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@ui-sdk/react/button";
-import { SparkleIcon } from "@/components/ui/icons";
+import { LogoMark } from "@/components/ui/logo";
 
 export function SiteNav() {
   return (
@@ -12,9 +12,7 @@ export function SiteNav() {
           href="/"
           className="pointer-events-auto flex h-11 items-center gap-2 rounded-pill border border-line bg-surface pl-2 pr-4 transition-transform duration-200 ease-out active:scale-95"
         >
-          {/*<span className="flex h-7 w-7 items-center justify-center rounded-pill bg-accent text-accent-ink">
-            <SparkleIcon className="h-4 w-4" />
-          </span>*/}
+          <LogoMark className="h-7 w-7 text-accent" />
           <span className="font-display text-sm font-bold leading-none tracking-tight">
             genium
           </span>

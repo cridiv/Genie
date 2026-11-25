@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@ui-sdk/react/button";
@@ -31,54 +31,84 @@ export function ScanCamera({
   const videoRef = useRef<HTMLVideoElement>(null);
   const nativeRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<"starting" | "live" | "blocked">("starting");
+  const [blockReason, setBlockReason] = useState<
+    "insecure" | "denied" | "unavailable" | null
+  >(null);
   const [flash, setFlash] = useState(0);
   const reduced = useReducedMotion();
+
+  const stopStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }, []);
+
+  const requestCamera = useCallback(async () => {
+    stopStream();
+    setStatus("starting");
+    setBlockReason(null);
+
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setBlockReason("insecure");
+      setStatus("blocked");
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setBlockReason("unavailable");
+      setStatus("blocked");
+      return;
+    }
+
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1440 },
+          height: { ideal: 1440 },
+        },
+      });
+    } catch {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: true,
+        });
+      } catch (err) {
+        const name = err instanceof DOMException ? err.name : "";
+        setBlockReason(
+          name === "NotAllowedError" || name === "PermissionDeniedError"
+            ? "denied"
+            : "unavailable",
+        );
+        setStatus("blocked");
+        return;
+      }
+    }
+
+    streamRef.current = stream;
+    const video = videoRef.current;
+    if (!video) {
+      stopStream();
+      return;
+    }
+
+    video.srcObject = stream;
+    await video.play().catch(() => undefined);
+    setStatus("live");
+  }, [stopStream]);
 
   // The stream lives for the whole capture phase, so stepping from front to
   // back never restarts the camera.
   useEffect(() => {
-    let cancelled = false;
-    let stream: MediaStream | null = null;
-
-    async function start() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setStatus("blocked");
-        return;
-      }
-
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1440 },
-            height: { ideal: 1440 },
-          },
-        });
-      } catch {
-        if (!cancelled) setStatus("blocked");
-        return;
-      }
-
-      const video = videoRef.current;
-      if (cancelled || !video) {
-        stream.getTracks().forEach((track) => track.stop());
-        return;
-      }
-
-      video.srcObject = stream;
-      await video.play().catch(() => undefined);
-      if (!cancelled) setStatus("live");
-    }
-
-    void start();
-
+    void requestCamera();
     return () => {
-      cancelled = true;
-      stream?.getTracks().forEach((track) => track.stop());
+      stopStream();
     };
-  }, []);
+  }, [requestCamera, stopStream]);
 
   function shoot() {
     const video = videoRef.current;
@@ -127,11 +157,38 @@ export function ScanCamera({
         )}
 
         {status === "blocked" ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3">
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-pill bg-card text-warn">
               <AlertIcon className="h-6 w-6" />
             </span>
-            <p className="text-sm font-semibold text-muted">Camera off</p>
+            <p className="text-sm font-semibold text-fg">
+              {blockReason === "insecure"
+                ? "Live preview requires HTTPS"
+                : "Camera permission needed"}
+            </p>
+            <p className="max-w-[240px] text-xs text-muted">
+              {blockReason === "insecure"
+                ? "Tap below to take a photo directly with your camera, or open the HTTPS link for live preview."
+                : "Allow camera access to scan medicine packs live, or use your device camera."}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+              {blockReason !== "insecure" && (
+                <Button
+                  onClick={() => void requestCamera()}
+                  className="flex h-10 items-center justify-center gap-2 rounded-pill bg-accent px-4 text-xs font-semibold text-accent-ink transition-transform active:scale-95"
+                >
+                  <CameraIcon className="h-4 w-4" />
+                  Allow camera
+                </Button>
+              )}
+              <Button
+                onClick={() => nativeRef.current?.click()}
+                className="flex h-10 items-center justify-center gap-2 rounded-pill border border-line bg-card px-4 text-xs font-semibold text-fg transition-transform active:scale-95"
+              >
+                <CameraIcon className="h-4 w-4" />
+                Open camera
+              </Button>
+            </div>
           </div>
         ) : (
           <>

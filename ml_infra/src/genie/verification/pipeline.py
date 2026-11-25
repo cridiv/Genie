@@ -24,7 +24,6 @@ from genie.verification.signals.batch_signal import BatchSignalEvaluator
 from genie.verification.signals.history_signal import HistorySignalEvaluator
 from genie.verification.signals.nafdac_signal import NAFDACSignalEvaluator
 from genie.verification.signals.visual_signal import VisualSignalEvaluator
-from genie.vision.anomaly import PatchCoreAnomalyDetector
 from genie.vision.embed import VisualEmbedder
 from genie.vision.ocr import PackagingOCR
 from genie.vision.pack_compare import PackComparator
@@ -52,7 +51,6 @@ class VerificationPipeline:
         self.barcode_detector = BarcodeDetector()
         self.visual_embedder = VisualEmbedder()
         self.ocr = PackagingOCR(enable_vlm=False)
-        self.anomaly_detector = PatchCoreAnomalyDetector()
         self.pack_comparator = PackComparator()
         self.vlm_reviewer = VLMReviewer()
         self.resolver = ProductResolver(vector_store)

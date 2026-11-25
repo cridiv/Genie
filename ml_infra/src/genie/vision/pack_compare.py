@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
-from genie.vision.anomaly import PatchCoreAnomalyDetector
 from genie.vision.match import AlignmentResult, GeometricMatcher
 from genie.vision.print_forensics import PrintForensicsAnalyzer
 
@@ -67,7 +66,7 @@ class PackComparator:
         max_delta_e_ab: float = 10.0,
         max_element_shift_px: float = 18.0,
         min_element_ncc: float = 0.45,
-        min_texture_score: float = 0.55,
+        min_texture_score: float = 0.80,
         suspect_threshold: float = 0.65,
     ):
         self.canonical_size = canonical_size
@@ -82,7 +81,6 @@ class PackComparator:
             min_inlier_ratio=0.30,
             max_reprojection_error=5.0,
         )
-        self.anomaly_detector = PatchCoreAnomalyDetector()
 
     @staticmethod
     def _compute_ssim(gray_a: np.ndarray, gray_b: np.ndarray) -> float:
@@ -297,7 +295,7 @@ class PackComparator:
         aligned_query: np.ndarray,
         ref_img: np.ndarray,
     ) -> Tuple[float, bool]:
-        """Compares package surface micro-texture (LBP, 2D FFT radial spectrum, high-pass roughness)."""
+        """Compares package surface micro-texture via illumination-invariant LBP and surface roughness."""
         q_norm = self._normalize_luminance(aligned_query, ref_img)
         q_gray = cv2.cvtColor(q_norm, cv2.COLOR_BGR2GRAY)
         r_gray = cv2.cvtColor(ref_img, cv2.COLOR_BGR2GRAY)
@@ -307,29 +305,14 @@ class PackComparator:
         lbp_r = self._compute_lbp_hist(r_gray)
         lbp_sim = float(np.clip(np.dot(lbp_q, lbp_r), 0.0, 1.0))
 
-        # 2. 2D FFT radial frequency band energy similarity (offset screen vs inkjet/glossy stock)
-        qf = np.log1p(np.abs(np.fft.fftshift(np.fft.fft2(q_gray.astype(np.float32) - np.mean(q_gray)))))
-        rf = np.log1p(np.abs(np.fft.fftshift(np.fft.fft2(r_gray.astype(np.float32) - np.mean(r_gray)))))
-        h, w = r_gray.shape[:2]
-        cy, cx = h // 2, w // 2
-        yy, xx = np.ogrid[:h, :w]
-        dist = np.sqrt((yy - cy) ** 2 + (xx - cx) ** 2)
-        max_r = float(min(h, w) // 2)
-        bands = np.linspace(4.0, max_r, 7)
-        q_vec = np.array([float(np.mean(qf[(dist >= bands[i]) & (dist < bands[i + 1])])) for i in range(6)], dtype=np.float32)
-        r_vec = np.array([float(np.mean(rf[(dist >= bands[i]) & (dist < bands[i + 1])])) for i in range(6)], dtype=np.float32)
-        q_vec /= np.linalg.norm(q_vec) + 1e-6
-        r_vec /= np.linalg.norm(r_vec) + 1e-6
-        fft_sim = float(np.clip(np.dot(q_vec, r_vec), 0.0, 1.0))
-
-        # 3. High-pass surface roughness / micro-contrast ratio
+        # 2. High-pass surface roughness / micro-contrast ratio
         q_hp = q_gray.astype(np.float32) - cv2.GaussianBlur(q_gray.astype(np.float32), (5, 5), 1.0)
         r_hp = r_gray.astype(np.float32) - cv2.GaussianBlur(r_gray.astype(np.float32), (5, 5), 1.0)
         std_q = float(np.std(q_hp))
         std_r = float(np.std(r_hp))
         roughness_ratio = float(min(std_q, std_r) / (max(std_q, std_r) + 1e-5)) if max(std_q, std_r) > 1e-3 else 1.0
 
-        texture_score = float(np.clip(0.45 * lbp_sim + 0.30 * fft_sim + 0.25 * roughness_ratio, 0.0, 1.0))
+        texture_score = float(np.clip(0.65 * lbp_sim + 0.35 * roughness_ratio, 0.0, 1.0))
         return texture_score, texture_score < self.min_texture_score
 
     def compare(
@@ -372,11 +355,11 @@ class PackComparator:
         else:
             layout_score = float(0.70 * structural_ssim + 0.30 * edge_score)
 
-        # 4. Patch-Level Anomaly & Print Sharpness
-        anomaly_res = self.anomaly_detector.evaluate(
-            aligned_query=aligned_query,
-            aligned_reference=ref_resized,
-        )
+        # 4. Lightweight Spatial Difference Score & Print Sharpness (PatchCore moved to roadmap)
+        diff = cv2.absdiff(aligned_query, ref_resized)
+        diff_gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
+        smoothed_diff = cv2.GaussianBlur(diff_gray, (15, 15), 0).astype(np.float32) / 255.0
+        anomaly_score = float(np.clip(np.mean(smoothed_diff) * 2.5, 0.0, 1.0))
         q_sharp = PrintForensicsAnalyzer.edge_sharpness(aligned_query)
         r_sharp = PrintForensicsAnalyzer.edge_sharpness(ref_resized)
         sharpness_ratio = float(q_sharp / (r_sharp + 1e-5))
@@ -394,7 +377,7 @@ class PackComparator:
                 + 0.25 * color_score
                 + 0.30 * layout_score
                 + 0.20 * texture_score
-                + 0.10 * (1.0 - anomaly_res.anomaly_score),
+                + 0.10 * (1.0 - anomaly_score),
                 0.0,
                 1.0,
             )
@@ -454,12 +437,12 @@ class PackComparator:
             layout_score=layout_score,
             structural_ssim=structural_ssim,
             edge_alignment_score=edge_score,
-            anomaly_score=anomaly_res.anomaly_score,
+            anomaly_score=anomaly_score,
             sharpness_ratio=sharpness_ratio,
             texture_score=texture_score,
             texture_mismatch=texture_mismatch,
             element_checks=element_checks,
             flagged_grid_zones=flagged_zones,
             inconsistencies=inconsistencies,
-            heatmap_bytes=anomaly_res.heatmap_bytes,
+            heatmap_bytes=None,
         )

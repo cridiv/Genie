@@ -1,13 +1,10 @@
-"""Tests for reference-to-query packaging comparison (color, element positioning, layout, and pipeline DB integration)."""
+"""Tests for reference-to-query packaging comparison (color, element positioning, layout, and stateless pipeline)."""
 import base64
-from datetime import date
 import uuid
 import cv2
 import numpy as np
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from genie.db.models import Base, Product, ProductVersion
 from genie.schemas.scan import ScanImage, ScanRequest
 from genie.storage.object_store import LocalImageStorage
 from genie.storage.vector_store import InMemoryVectorStore
@@ -116,70 +113,49 @@ def test_shifted_and_missing_elements_are_flagged():
 
 @pytest.mark.asyncio
 async def test_reference_indexer_and_pipeline_comparison(tmp_path):
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     vector_store = InMemoryVectorStore()
     storage = LocalImageStorage(base_dir=tmp_path / "images")
 
     ref_img, regions = _make_synthetic_pack()
 
-    async with session_factory() as db:
-        p = Product(
-            id=uuid.uuid4(),
-            brand_name="GENIEMED",
-            manufacturer="GENIE PHARMA",
-            primary_nafdac_number="B4-6458",
-            gtin_list=["06150000000012"],
-            status="approved",
-        )
-        v = ProductVersion(
-            id=uuid.uuid4(),
-            product_id=p.id,
-            version_label="v1.0",
-            valid_from=date(2025, 1, 1),
-            status="active",
-        )
-        db.add_all([p, v])
-        await db.flush()
+    indexer = ReferencePackIndexer(vector_store=vector_store, image_storage=storage)
+    ref_record = await indexer.index_reference_pack(
+        product_id=str(uuid.uuid4()),
+        product_version_id=str(uuid.uuid4()),
+        image_bgr=ref_img,
+        brand_name="GENIEMED",
+        manufacturer="GENIE PHARMA",
+        nafdac_number="B4-6458",
+        gtin_list=["06150000000012"],
+        version_label="v1.0",
+        face_type="front",
+        semantic_regions=regions,
+    )
+    assert ref_record.sha256_hash
+    assert len(ref_record.dhash_64bit) == 16
 
-        indexer = ReferencePackIndexer(db_session=db, vector_store=vector_store, image_storage=storage)
-        ref_record = await indexer.index_reference_pack(
-            product_version=v,
-            image_bgr=ref_img,
-            face_type="front",
-            semantic_regions=regions,
+    pipeline = VerificationPipeline(vector_store=vector_store)
+
+    # 1. Genuine scan
+    _, ok_buf = cv2.imencode(".jpg", ref_img)
+    ok_b64 = base64.b64encode(ok_buf.tobytes()).decode("utf-8")
+    res_ok = await pipeline.verify_scan(
+        ScanRequest(
+            images=[ScanImage(image_bytes_base64=ok_b64, face_hint="front")],
+            manual_nafdac="B4-6458",
         )
-        await db.commit()
-        assert ref_record.sha256_hash
-        assert len(ref_record.dhash_64bit) == 16
+    )
+    assert res_ok.signals.visual_similarity_score >= 0.80
 
-        pipeline = VerificationPipeline(db_session=db, vector_store=vector_store)
-
-        # 1. Genuine scan
-        _, ok_buf = cv2.imencode(".jpg", ref_img)
-        ok_b64 = base64.b64encode(ok_buf.tobytes()).decode("utf-8")
-        res_ok = await pipeline.verify_scan(
-            ScanRequest(
-                images=[ScanImage(image_bytes_base64=ok_b64, face_hint="front")],
-                manual_nafdac="B4-6458",
-            )
+    # 2. Counterfeit color-altered scan
+    fake_img = ref_img[:, :, ::-1].copy()
+    _, fake_buf = cv2.imencode(".jpg", fake_img)
+    fake_b64 = base64.b64encode(fake_buf.tobytes()).decode("utf-8")
+    res_fake = await pipeline.verify_scan(
+        ScanRequest(
+            images=[ScanImage(image_bytes_base64=fake_b64, face_hint="front")],
+            manual_nafdac="B4-6458",
         )
-        assert res_ok.signals.visual_similarity_score >= 0.80
-
-        # 2. Counterfeit color-altered scan
-        fake_img = ref_img[:, :, ::-1].copy()
-        _, fake_buf = cv2.imencode(".jpg", fake_img)
-        fake_b64 = base64.b64encode(fake_buf.tobytes()).decode("utf-8")
-        res_fake = await pipeline.verify_scan(
-            ScanRequest(
-                images=[ScanImage(image_bytes_base64=fake_b64, face_hint="front")],
-                manual_nafdac="B4-6458",
-            )
-        )
-        assert res_fake.signals.visual_similarity_score < res_ok.signals.visual_similarity_score
-        assert any("color mismatch" in r.lower() for r in res_fake.signals.reasons)
-
-    await engine.dispose()
+    )
+    assert res_fake.signals.visual_similarity_score < res_ok.signals.visual_similarity_score
+    assert any("color mismatch" in r.lower() for r in res_fake.signals.reasons)

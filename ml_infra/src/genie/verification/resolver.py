@@ -1,154 +1,124 @@
-"""Candidate product resolution via hierarchical voting between GTIN, NAFDAC, and visual vectors, with SCD Type 2 history traversal."""
-from dataclasses import dataclass
+"""Stateless candidate product resolution via Backend-supplied candidate metadata or Qdrant vector metadata."""
+from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
-from uuid import UUID
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from genie.db.models import Product, ProductVersion
+from genie.schemas.scan import ReferenceCandidateInput
 from genie.storage.vector_store import VectorStore
 
 
 @dataclass
 class ResolvedCandidate:
-    product: Product
-    active_version: ProductVersion
-    matched_version: ProductVersion
+    brand_name: str
+    manufacturer: str
+    gtin_list: List[str] = field(default_factory=list)
+    primary_nafdac_number: Optional[str] = None
+    version_label: Optional[str] = None
     is_legacy_version: bool = False
     in_transition_window: bool = True
     confidence: float = 0.0
-    resolution_method: str = "unknown"  # gtin | nafdac | vector
+    resolution_method: str = "unknown"  # backend_candidate | gtin | nafdac | vector
+    nafdac_status: str = "active"
+    batch_number_regex: Optional[str] = None
+    reference_image_base64: Optional[str] = None
+    reference_image_path: Optional[str] = None
+    semantic_regions: Optional[Dict[str, Any]] = None
 
 
 class ProductResolver:
-    """Resolves scan signals to candidate product versions in the intelligence database."""
+    """Resolves scan signals against Backend-supplied metadata or VectorStore payloads."""
 
-    def __init__(self, db_session: AsyncSession, vector_store: VectorStore):
-        self.db = db_session
+    def __init__(self, vector_store: VectorStore):
         self.vector_store = vector_store
+
+    @staticmethod
+    def _from_metadata(
+        meta: Dict[str, Any],
+        confidence: float,
+        method: str,
+        current_date: date,
+    ) -> ResolvedCandidate:
+        status = str(meta.get("status", "active"))
+        is_legacy = status == "superseded"
+        in_window = True
+
+        valid_to_str = meta.get("valid_to")
+        if is_legacy and valid_to_str:
+            valid_to = date.fromisoformat(str(valid_to_str)) if isinstance(valid_to_str, str) else valid_to_str
+            shelf_days = int(meta.get("shelf_life_months", 24)) * 30
+            days_since_expiry = (current_date - valid_to).days
+            in_window = days_since_expiry <= shelf_days
+
+        return ResolvedCandidate(
+            brand_name=str(meta.get("brand_name") or "Unknown Product"),
+            manufacturer=str(meta.get("manufacturer") or "Unknown Manufacturer"),
+            gtin_list=[str(g) for g in (meta.get("gtin_list") or [])],
+            primary_nafdac_number=meta.get("nafdac_number"),
+            version_label=meta.get("version_label"),
+            is_legacy_version=is_legacy,
+            in_transition_window=in_window,
+            confidence=confidence,
+            resolution_method=method,
+            nafdac_status=str(meta.get("nafdac_status", "active")),
+            batch_number_regex=meta.get("batch_number_regex"),
+            reference_image_path=meta.get("storage_path"),
+            semantic_regions=meta.get("semantic_regions"),
+        )
 
     async def resolve(
         self,
         gtin: Optional[str] = None,
         nafdac_number: Optional[str] = None,
         embedding: Optional[List[float]] = None,
+        reference_candidate: Optional[ReferenceCandidateInput] = None,
         current_date: Optional[date] = None,
     ) -> Optional[ResolvedCandidate]:
-        """Executes hierarchical voting to identify the product entity and active/historical version."""
+        """Executes hierarchical resolution using Backend candidate metadata or VectorStore."""
         curr_d = current_date or date.today()
 
-        # Priority 1: Resolve by GTIN
-        if gtin:
+        # Priority 0: Explicit candidate metadata + reference image supplied by Backend
+        if reference_candidate is not None:
+            return ResolvedCandidate(
+                brand_name=reference_candidate.brand_name or "Unknown Product",
+                manufacturer=reference_candidate.manufacturer or "Unknown Manufacturer",
+                gtin_list=list(reference_candidate.gtin_list),
+                primary_nafdac_number=reference_candidate.primary_nafdac_number,
+                version_label=reference_candidate.version_label,
+                is_legacy_version=reference_candidate.is_legacy_version,
+                in_transition_window=reference_candidate.in_transition_window,
+                confidence=0.98,
+                resolution_method="backend_candidate",
+                nafdac_status=reference_candidate.nafdac_status,
+                batch_number_regex=reference_candidate.batch_number_regex,
+                reference_image_base64=reference_candidate.reference_image_base64,
+                reference_image_path=reference_candidate.reference_image_path,
+                semantic_regions=reference_candidate.semantic_regions,
+            )
+
+        # Priority 1: VectorStore pre-filtered by GTIN
+        if gtin and embedding:
             clean_gtin = gtin.strip()
-            stmt = select(Product)
-            res = await self.db.execute(stmt)
-            products = res.scalars().all()
-            for p in products:
-                if p.gtin_list and clean_gtin in [str(g).strip() for g in p.gtin_list]:
-                    active_v = await self._get_active_version(p.id)
-                    if active_v:
-                        return ResolvedCandidate(
-                            product=p,
-                            active_version=active_v,
-                            matched_version=active_v,
-                            is_legacy_version=False,
-                            in_transition_window=True,
-                            confidence=0.98,
-                            resolution_method="gtin",
-                        )
+            matches = await self.vector_store.search(
+                embedding, top_k=1, filter_metadata={"gtin_list": clean_gtin}
+            )
+            if matches:
+                return self._from_metadata(matches[0].metadata, 0.98, "gtin", curr_d)
 
-        # Priority 2: Resolve by NAFDAC Number
-        if nafdac_number:
+        # Priority 2: VectorStore pre-filtered by NAFDAC number
+        if nafdac_number and embedding:
             clean_nafdac = nafdac_number.strip().upper()
-            stmt = select(Product).filter(Product.primary_nafdac_number == clean_nafdac)
-            res = await self.db.execute(stmt)
-            product = res.scalars().first()
-            if product:
-                active_v = await self._get_active_version(product.id)
-                if active_v:
-                    return ResolvedCandidate(
-                        product=product,
-                        active_version=active_v,
-                        matched_version=active_v,
-                        is_legacy_version=False,
-                        in_transition_window=True,
-                        confidence=0.92,
-                        resolution_method="nafdac",
-                    )
+            matches = await self.vector_store.search(
+                embedding, top_k=1, filter_metadata={"nafdac_number": clean_nafdac}
+            )
+            if matches:
+                return self._from_metadata(matches[0].metadata, 0.92, "nafdac", curr_d)
 
-        # Priority 3: Resolve by Visual Vector Search
+        # Priority 3: Global visual vector similarity search
         if embedding:
             matches = await self.vector_store.search(embedding, top_k=1)
             if matches and matches[0].score >= 0.75:
-                v_id_str = matches[0].metadata.get("product_version_id")
-                if v_id_str:
-                    v_uuid = UUID(v_id_str)
-                    stmt = select(ProductVersion).filter(ProductVersion.id == v_uuid)
-                    res = await self.db.execute(stmt)
-                    version = res.scalars().first()
-                    if version:
-                        p_stmt = select(Product).filter(Product.id == version.product_id)
-                        p_res = await self.db.execute(p_stmt)
-                        product = p_res.scalars().first()
-                        if product:
-                            active_v = await self._get_active_version(product.id) or version
-                            is_legacy = version.status == "superseded"
-                            in_window = True
-
-                            if is_legacy and version.valid_to:
-                                shelf_days = getattr(version, "shelf_life_months", 24) * 30
-                                days_since_expiry = (curr_d - version.valid_to).days
-                                in_window = days_since_expiry <= shelf_days
-
-                            return ResolvedCandidate(
-                                product=product,
-                                active_version=active_v,
-                                matched_version=version,
-                                is_legacy_version=is_legacy,
-                                in_transition_window=in_window,
-                                confidence=matches[0].score,
-                                resolution_method="vector",
-                            )
+                return self._from_metadata(
+                    matches[0].metadata, float(matches[0].score), "vector", curr_d
+                )
 
         return None
-
-    async def traverse_historical_versions(
-        self,
-        product_id: UUID,
-        current_date: Optional[date] = None,
-    ) -> List[Tuple[ProductVersion, bool]]:
-        """Traverses historical (superseded) versions and calculates transition window validity.
-
-        Returns list of (ProductVersion, is_within_transition_window).
-        """
-        curr_d = current_date or date.today()
-        stmt = (
-            select(ProductVersion)
-            .filter(ProductVersion.product_id == product_id, ProductVersion.status == "superseded")
-            .order_by(ProductVersion.valid_to.desc())
-        )
-        res = await self.db.execute(stmt)
-        superseded_versions = res.scalars().all()
-
-        results = []
-        for v in superseded_versions:
-            if v.valid_to:
-                shelf_days = getattr(v, "shelf_life_months", 24) * 30
-                days_since_transition = (curr_d - v.valid_to).days
-                in_window = days_since_transition <= shelf_days
-            else:
-                in_window = True
-            results.append((v, in_window))
-
-        return results
-
-    async def _get_active_version(self, product_id: UUID) -> Optional[ProductVersion]:
-        stmt = (
-            select(ProductVersion)
-            .filter(ProductVersion.product_id == product_id, ProductVersion.status == "active")
-            .order_by(ProductVersion.created_at.desc())
-        )
-        res = await self.db.execute(stmt)
-        return res.scalars().first()

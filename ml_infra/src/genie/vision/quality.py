@@ -58,18 +58,29 @@ class ImageQualityGate:
             guidance.append("MOVE_CLOSER")
 
         # 2. Specular Glare Evaluation in HSV Color Space (V > 245, S < 35)
+        # Exclude border-connected white studio backgrounds so clean white-background product photos pass.
         glare_ratio = 0.0
         if hsv is not None:
             v_channel = hsv[:, :, 2]
             s_channel = hsv[:, :, 1]
-            glare_pixels = (v_channel > 245) & (s_channel < 35)
+            raw_glare = ((v_channel > 245) & (s_channel < 35)).astype(np.uint8)
+
+            h_img, w_img = raw_glare.shape[:2]
+            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(raw_glare, connectivity=8)
+            filtered_glare = np.zeros_like(raw_glare, dtype=bool)
+            for lbl in range(1, num_labels):
+                x, y, bw, bh, area = stats[lbl]
+                touches_border = (x == 0) or (y == 0) or (x + bw >= w_img) or (y + bh >= h_img)
+                if touches_border and (area / float(raw_glare.size)) >= 0.015:
+                    continue
+                filtered_glare |= (labels == lbl)
 
             if pack_mask is not None and np.count_nonzero(pack_mask) > 0:
                 pack_pixel_count = np.count_nonzero(pack_mask)
-                glare_in_pack = np.count_nonzero(glare_pixels & (pack_mask > 0))
+                glare_in_pack = np.count_nonzero(filtered_glare & (pack_mask > 0))
                 glare_ratio = float(glare_in_pack / pack_pixel_count)
             else:
-                glare_ratio = float(np.count_nonzero(glare_pixels) / glare_pixels.size)
+                glare_ratio = float(np.count_nonzero(filtered_glare) / filtered_glare.size)
 
             if glare_ratio > self.max_glare_ratio:
                 guidance.append("REDUCE_GLARE")

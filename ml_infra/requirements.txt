@@ -33,6 +33,7 @@ numpy>=1.26.0
 pillow>=10.2.0
 opencv-python-headless>=4.9.0
 onnxruntime>=1.17.0
+rapidocr-onnxruntime>=1.4.0
 scikit-learn>=1.4.0
 
 # --- Extraction, LLM & Configuration ---

@@ -245,6 +245,28 @@ For any future change affecting the database (`src/genie/db/models.py`, Alembic 
     - Full test suite passed: **76/76 tests passed** across `tests/` and `evaluation/`.
     - Database schema status: Zero database changes required (`ReferenceImage` already includes `storage_path` and `semantic_regions`).
 
+20. **Post-Evaluation Model & Pipeline Remediation (Phase 11) [2026-11-24]**:
+    - Remediated 7 pipeline defects surfaced by real-image testing on `/ml_infra/images`:
+      1. Eliminated false-confidence defaults in [`batch_signal.py`](src/genie/verification/signals/batch_signal.py) (`0.90` $\rightarrow$ `0.50` when undetected), [`history_signal.py`](src/genie/verification/signals/history_signal.py) (`1.00` $\rightarrow$ `0.50` when unresolved), and [`visual_signal.py`](src/genie/verification/signals/visual_signal.py) (`0.59` $\rightarrow$ `0.50` when no reference pack exists).
+      2. Expanded `NAFDAC_PATTERNS` in [`ocr.py`](src/genie/vision/ocr.py) from `[A-B]\d` to `[A-Z]\d` (supporting `C4-XXXX` / `D4-XXXX`) and added `rapidocr_onnxruntime`, `easyocr`, and `pytesseract` fallback chain.
+      3. Added bounded `pylibdmtx.decode(..., timeout=40, max_count=1)` in [`decode.py`](src/genie/barcode/decode.py) and crop-first `BarcodeDetector` localization in [`pipeline.py`](src/genie/verification/pipeline.py).
+      4. Calibrated [`vlm_review.py`](src/genie/vision/vlm_review.py) multi-pack prompt and integrated high-confidence VLM tampering discrepancies into [`pipeline.py`](src/genie/verification/pipeline.py).
+    - Database schema status: Zero database changes required.
+
+21. **Stateless ML Service Refactoring & SQL DB Removal [2026-11-25]**:
+    - Refactored `ml_infra` into a **stateless ML inference & vector search microservice** (Backend owns PostgreSQL for `products`, `product_versions`, `scan_records`, and `pharmacies`).
+    - Added `ReferenceCandidateInput` to [`src/genie/schemas/scan.py`](src/genie/schemas/scan.py) so Backend can pass candidate metadata and reference pack image (`reference_image_base64` / `reference_image_path` / `semantic_regions`) directly in `POST /v1/verify`.
+    - Refactored [`ProductResolver`](src/genie/verification/resolver.py), [`ReferencePackIndexer`](src/genie/vision/reference_index.py), and [`VerificationPipeline`](src/genie/verification/pipeline.py) to operate purely on `ReferenceCandidateInput`, `ImageStorage`, and `VectorStore` (Qdrant / `InMemoryVectorStore`) without `AsyncSession` or SQLAlchemy.
+    - Added `POST /v1/reference/index` in [`src/genie/api/v1/verify.py`](src/genie/api/v1/verify.py) and cleaned up [`src/genie/api/main.py`](src/genie/api/main.py) and [`src/genie/api/deps.py`](src/genie/api/deps.py).
+    - **Database Removal:** Deleted `src/genie/db/`, `src/genie/pharmacy/`, `src/genie/api/v1/products.py`, `src/genie/api/v1/pharmacies.py`, and removed `DATABASE_URL` from [`src/genie/common/config.py`](src/genie/common/config.py).
+    - Verified all **75/75 tests** pass across `tests/` and `evaluation/` with zero remaining SQLAlchemy or `genie.db` references.
+
+22. **Quality Gate Glare Calibration, RapidOCR Offline Engine & Unindexed Verdict Fix (Phase 12) [2026-11-25]**:
+    - Updated [`src/genie/vision/quality.py`](src/genie/vision/quality.py) to exclude border-connected white studio backgrounds via `connectedComponentsWithStats` so clear white-background product photos (e.g. `images (12).jpg`) pass `ImageQualityGate` while genuine interior specular flash hotspots are still rejected.
+    - Installed `rapidocr-onnxruntime==1.4.4` into `.venv`, added it to [`requirements.txt`](requirements.txt), and cached `RapidOCR()` in [`src/genie/vision/ocr.py`](src/genie/vision/ocr.py) for offline CPU OCR extraction.
+    - Added hyphenless NAFDAC normalization (`A44724` $\rightarrow$ `A4-4724`) in [`src/genie/extraction/nafdac_parser.py`](src/genie/extraction/nafdac_parser.py) and [`src/genie/vision/ocr.py`](src/genie/vision/ocr.py).
+    - Updated [`src/genie/verification/signals/nafdac_signal.py`](src/genie/verification/signals/nafdac_signal.py) and [`src/genie/verification/pipeline.py`](src/genie/verification/pipeline.py) with `registry_checked` so unindexed scans return `Cannot verify` instead of false `Suspicious` verdicts.
+
 ---
 
 ## 2. Database Changelog

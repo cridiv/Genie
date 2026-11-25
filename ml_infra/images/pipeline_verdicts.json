@@ -1,0 +1,906 @@
+{
+  "images": [
+    {
+      "filename": "images (10).jpg",
+      "resolution": "629x486",
+      "quality_gate": {
+        "passed": true,
+        "blur_score": 3842.01,
+        "glare_ratio": 0.0173,
+        "guidance_codes": []
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.25,
+        "confidence": 0.95,
+        "is_consistent": false,
+        "triage_verdict": "Suspicious",
+        "detected_nafdac": null,
+        "detected_batch": null,
+        "detected_expiry": null,
+        "reasons": [
+          "Different country of origin labels (France vs Istanbul, Turkey)",
+          "Inconsistent blister pack designs and tablet counts (4x15 vs 6x10)",
+          "Missing NAFDAC registration number, batch, and expiry dates"
+        ],
+        "discrepancies": [
+          "Mismatched tablet count per pack (15 vs 10)",
+          "Different number of packs (4 vs 6) despite same total tablets",
+          "Varied visual design (color borders, background patterns)",
+          "Absence of required regulatory details (NAFDAC, lot, expiry)"
+        ]
+      },
+      "pipeline_result": {
+        "verdict": "Suspicious",
+        "confidence": 0.25,
+        "matched_product_name": null,
+        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Insufficient verifiable signals detected from uploaded scan.. Please report this scan to NAFDAC enforcement.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.5,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC registration number not located by OCR.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified.",
+            "Label text mismatch: original 'daflon 500 mg' vs counterfeit 'daflon 500 mg film tablet'",
+            "Country of origin mismatch: France vs Turkey",
+            "Different blister pack designs and tablet counts per pack (15x4 vs 10x6) though total tablets same",
+            "Absence of regulatory seals or tamper-evident features on counterfeit packaging"
+          ]
+        },
+        "execution_time_ms": 16058.9
+      }
+    },
+    {
+      "filename": "images (11).jpg",
+      "resolution": "275x183",
+      "quality_gate": {
+        "passed": false,
+        "blur_score": 4657.23,
+        "glare_ratio": 0.0829,
+        "guidance_codes": [
+          "REDUCE_GLARE"
+        ]
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.95,
+        "confidence": 0.92,
+        "is_consistent": true,
+        "triage_verdict": "Consistent with genuine",
+        "detected_nafdac": null,
+        "detected_batch": null,
+        "detected_expiry": null,
+        "reasons": [
+          "Clear, sharp branding and dosage text with no smudging",
+          "Standard Pfizer logo and product layout consistent with genuine packaging",
+          "No visible tampering, torn labels, or handwritten markings"
+        ],
+        "discrepancies": []
+      },
+      "pipeline_result": {
+        "verdict": "REJECTED_BY_QUALITY_GATE",
+        "error": "Image failed quality thresholds: REDUCE_GLARE",
+        "details": {
+          "guidance_codes": [
+            "REDUCE_GLARE"
+          ]
+        }
+      }
+    },
+    {
+      "filename": "images (12).jpg",
+      "resolution": "458x670",
+      "quality_gate": {
+        "passed": false,
+        "blur_score": 26038.56,
+        "glare_ratio": 0.3378,
+        "guidance_codes": [
+          "REDUCE_GLARE"
+        ]
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.95,
+        "confidence": 0.96,
+        "is_consistent": true,
+        "triage_verdict": "Consistent with genuine",
+        "detected_nafdac": "A44724",
+        "detected_batch": "230701",
+        "detected_expiry": "07/2026",
+        "reasons": [
+          "Label is intact with no tears, hand-drawn markings, or missing seals",
+          "Print is sharp and legible; layout follows standard pharmaceutical packaging format",
+          "NAFDAC registration number, batch number, and expiry date are present and plausible"
+        ],
+        "discrepancies": []
+      },
+      "pipeline_result": {
+        "verdict": "REJECTED_BY_QUALITY_GATE",
+        "error": "Image failed quality thresholds: REDUCE_GLARE",
+        "details": {
+          "guidance_codes": [
+            "REDUCE_GLARE"
+          ]
+        }
+      }
+    },
+    {
+      "filename": "images (9).jpg",
+      "resolution": "724x424",
+      "quality_gate": {
+        "passed": false,
+        "blur_score": 942.78,
+        "glare_ratio": 0.2434,
+        "guidance_codes": [
+          "REDUCE_GLARE"
+        ]
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.6,
+        "confidence": 0.7,
+        "is_consistent": false,
+        "triage_verdict": "Suspicious",
+        "detected_nafdac": null,
+        "detected_batch": "210524M",
+        "detected_expiry": "04/2026",
+        "reasons": [
+          "Hand-drawn pen markings added after printing, suggesting possible alteration of batch/expiry information.",
+          "Red sticker covering part of the blister pack, indicating potential tampering or concealment.",
+          "No visible NAFDAC registration number, which is required for genuine Indian pharmaceutical packaging."
+        ],
+        "discrepancies": [
+          "Hand-written ink markings on the blister pack",
+          "Red sticker covering printed area",
+          "Absence of NAFDAC registration number",
+          "Potential mismatch between printed and hand-written batch/expiry data"
+        ]
+      },
+      "pipeline_result": {
+        "verdict": "REJECTED_BY_QUALITY_GATE",
+        "error": "Image failed quality thresholds: REDUCE_GLARE",
+        "details": {
+          "guidance_codes": [
+            "REDUCE_GLARE"
+          ]
+        }
+      }
+    },
+    {
+      "filename": "s9g8qx7q77.jpeg",
+      "resolution": "1500x1125",
+      "quality_gate": {
+        "passed": true,
+        "blur_score": 11457.85,
+        "glare_ratio": 0.0,
+        "guidance_codes": []
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.95,
+        "confidence": 0.98,
+        "is_consistent": true,
+        "triage_verdict": "Consistent with genuine",
+        "detected_nafdac": "B4-6458",
+        "detected_batch": null,
+        "detected_expiry": null,
+        "reasons": [
+          "Both boxes show identical branding, composition, manufacturer (IBU PHARMA NIGERIA LTD), and NAFDAC registration (B4-6458) with clear, sharp printing.",
+          "No visible tampering signs such as torn labels, hand-drawn markings, or missing regulatory seals are present.",
+          "Packaging layout matches expected outer (10 x 1 x 6) and inner (1 x 6) unit pack configuration, indicating normal multipack structure."
+        ],
+        "discrepancies": []
+      },
+      "pipeline_result": {
+        "verdict": "Suspicious",
+        "confidence": 0.7652,
+        "matched_product_name": null,
+        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Barcode not detected or unreadable.. Please report this scan to NAFDAC enforcement.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.2,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC number B4-6458 not found in official Greenbook registry.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified.",
+            "Left box's NAFDAC registration number is not displayed",
+            "No batch or expiry dates visible on either package"
+          ]
+        },
+        "execution_time_ms": 19455.05
+      }
+    },
+    {
+      "filename": "WA_1795563144706@868306938.jpeg",
+      "resolution": "1440x2560",
+      "quality_gate": {
+        "passed": true,
+        "blur_score": 1078.45,
+        "glare_ratio": 0.0,
+        "guidance_codes": []
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.2,
+        "confidence": 0.3,
+        "is_consistent": false,
+        "triage_verdict": "Cannot verify",
+        "detected_nafdac": null,
+        "detected_batch": null,
+        "detected_expiry": null,
+        "reasons": [
+          "Missing critical regulatory information (NAFDAC registration number, batch/lot number, expiry date)",
+          "No visible tampering signs (e.g., torn labels, hand-drawn markings) but insufficient data for full assessment",
+          "Layout appears generic with no distinctive manufacturer branding or unique packaging identifiers"
+        ],
+        "discrepancies": [
+          "Absence of mandatory pharmaceutical labeling elements (NAFDAC, batch, expiry)",
+          "Lack of clear manufacturer identification or product-specific details"
+        ]
+      },
+      "pipeline_result": {
+        "verdict": "Cannot verify",
+        "confidence": 0.25,
+        "matched_product_name": null,
+        "explanation": "Cannot verify scanned product at this time. Insufficient verifiable signals detected from uploaded scan.. Please ensure packaging is well-lit, glare-free, and re-scan the primary face.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.5,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC registration number not located by OCR.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified."
+          ]
+        },
+        "execution_time_ms": 6339.54
+      }
+    },
+    {
+      "filename": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "resolution": "1280x960",
+      "quality_gate": {
+        "passed": true,
+        "blur_score": 5717.47,
+        "glare_ratio": 0.0001,
+        "guidance_codes": []
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.3,
+        "confidence": 0.7,
+        "is_consistent": false,
+        "triage_verdict": "Suspicious",
+        "detected_nafdac": null,
+        "detected_batch": null,
+        "detected_expiry": null,
+        "reasons": [
+          "Hand-drawn blue pen marking on packaging indicating possible tampering",
+          "Visible face lacks visible NAFDAC registration number, batch/lot number, and expiry date",
+          "Box edges show physical wear and possible alteration beyond standard manufacturing"
+        ],
+        "discrepancies": [
+          "Hand-drawn blue pen marking",
+          "Absence of required regulatory information (NAFDAC, batch, expiry) on displayed face"
+        ]
+      },
+      "pipeline_result": {
+        "verdict": "Suspicious",
+        "confidence": 0.25,
+        "matched_product_name": null,
+        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Insufficient verifiable signals detected from uploaded scan.. Please report this scan to NAFDAC enforcement.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.5,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC registration number not located by OCR.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified.",
+            "Hand-drawn markings not part of original packaging design",
+            "Absence of mandatory regulatory information (NAFDAC, batch, expiry)",
+            "Possible alteration of packaging integrity through drawn lines"
+          ]
+        },
+        "execution_time_ms": 7085.98
+      }
+    },
+    {
+      "filename": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "resolution": "1280x960",
+      "quality_gate": {
+        "passed": true,
+        "blur_score": 7235.04,
+        "glare_ratio": 0.003,
+        "guidance_codes": []
+      },
+      "barcode": null,
+      "ocr": {
+        "nafdac_number": null,
+        "batch_number": null,
+        "expiry_date": null,
+        "raw_text_lines": []
+      },
+      "vlm_forensic_review": {
+        "score": 0.95,
+        "confidence": 0.9,
+        "is_consistent": true,
+        "triage_verdict": "Consistent with genuine",
+        "detected_nafdac": "C4-0143",
+        "detected_batch": "JT663",
+        "detected_expiry": "10/2027",
+        "reasons": [
+          "Clear, sharp print quality with standard pharmaceutical layout and legible text",
+          "Valid regulatory details including NAFDAC Reg. No. C4-0143 and logical expiry date (10/2027)",
+          "No visible signs of tampering such as torn seals, hand-drawn markings, or missing regulatory stickers"
+        ],
+        "discrepancies": []
+      },
+      "pipeline_result": {
+        "verdict": "Suspicious",
+        "confidence": 0.7652,
+        "matched_product_name": null,
+        "explanation": "Suspicious product detected for scanned product. We strongly recommend not consuming this item. Reason: Barcode not detected or unreadable.. Please report this scan to NAFDAC enforcement.",
+        "signals": {
+          "barcode_score": 0.5,
+          "nafdac_score": 0.2,
+          "batch_consistency_score": 0.5,
+          "visual_similarity_score": 0.5,
+          "patch_anomaly_score": null,
+          "history_match_score": 0.5,
+          "reasons": [
+            "Barcode not detected or unreadable.",
+            "NAFDAC number C4-0143 not found in official Greenbook registry.",
+            "Batch number and expiry date were not detected on the scanned face.",
+            "No canonical reference pack image available in database for visual comparison.",
+            "Product identity unresolved; packaging version history cannot be verified."
+          ]
+        },
+        "execution_time_ms": 25644.87
+      }
+    }
+  ],
+  "pairwise_comparisons": [
+    {
+      "image_a": "images (10).jpg",
+      "image_b": "images (11).jpg",
+      "overall_similarity_score": 0.3915,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.3333,
+      "color_score": 0.7088,
+      "delta_e_ab": 11.82,
+      "layout_score": 0.3453,
+      "structural_ssim": 0.3689,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 6, ratio: 0.33).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 11.8 > 10.0, hist corr = 0.94).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, upper-mid-left."
+      ]
+    },
+    {
+      "image_a": "images (10).jpg",
+      "image_b": "images (12).jpg",
+      "overall_similarity_score": 0.2413,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.1296,
+      "color_score": 0.22,
+      "delta_e_ab": 19.97,
+      "layout_score": 0.372,
+      "structural_ssim": 0.439,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 7, ratio: 0.13).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 20.0 > 10.0, hist corr = 0.21).",
+        "Structural layout deviations detected in pack zone(s): top-center-left, upper-mid-center-left, upper-mid-center-right, lower-mid-center-left."
+      ]
+    },
+    {
+      "image_a": "images (10).jpg",
+      "image_b": "images (9).jpg",
+      "overall_similarity_score": 0.2666,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2941,
+      "color_score": 0.225,
+      "delta_e_ab": 27.09,
+      "layout_score": 0.3887,
+      "structural_ssim": 0.4034,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.29).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 27.1 > 10.0, hist corr = 0.64).",
+        "Structural layout deviations detected in pack zone(s): top-center-left, top-center-right, upper-mid-center-left, upper-mid-center-right."
+      ]
+    },
+    {
+      "image_a": "images (10).jpg",
+      "image_b": "s9g8qx7q77.jpeg",
+      "overall_similarity_score": 0.4092,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2609,
+      "color_score": 0.5501,
+      "delta_e_ab": 13.74,
+      "layout_score": 0.416,
+      "structural_ssim": 0.4892,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 6, ratio: 0.26).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 13.7 > 10.0, hist corr = 0.64).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-center-left, upper-mid-center-right, lower-mid-center-left, lower-mid-center-right."
+      ]
+    },
+    {
+      "image_a": "images (10).jpg",
+      "image_b": "WA_1795563144706@868306938.jpeg",
+      "overall_similarity_score": 0.2381,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.24,
+      "color_score": 0.2601,
+      "delta_e_ab": 20.05,
+      "layout_score": 0.3377,
+      "structural_ssim": 0.4213,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 6, ratio: 0.24).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 20.1 > 10.0, hist corr = 0.33).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, top-right."
+      ]
+    },
+    {
+      "image_a": "images (10).jpg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "overall_similarity_score": 0.2229,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2,
+      "color_score": 0.4573,
+      "delta_e_ab": 17.21,
+      "layout_score": 0.2164,
+      "structural_ssim": 0.2265,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 6, ratio: 0.20).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 17.2 > 10.0, hist corr = 0.66).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, top-right."
+      ]
+    },
+    {
+      "image_a": "images (10).jpg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "overall_similarity_score": 0.2819,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2941,
+      "color_score": 0.6446,
+      "delta_e_ab": 10.52,
+      "layout_score": 0.2108,
+      "structural_ssim": 0.2132,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 10, ratio: 0.29).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 10.5 > 10.0, hist corr = 0.65).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, top-right."
+      ]
+    },
+    {
+      "image_a": "images (11).jpg",
+      "image_b": "images (12).jpg",
+      "overall_similarity_score": 0.26,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2174,
+      "color_score": 0.1424,
+      "delta_e_ab": 22.35,
+      "layout_score": 0.4015,
+      "structural_ssim": 0.4954,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.22).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 22.4 > 10.0, hist corr = 0.19).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-left, upper-mid-center-left, upper-mid-center-right, lower-mid-left."
+      ]
+    },
+    {
+      "image_a": "images (11).jpg",
+      "image_b": "images (9).jpg",
+      "overall_similarity_score": 0.2517,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.3333,
+      "color_score": 0.2473,
+      "delta_e_ab": 28.76,
+      "layout_score": 0.3611,
+      "structural_ssim": 0.3855,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.33).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 28.8 > 10.0, hist corr = 0.71).",
+        "Structural layout deviations detected in pack zone(s): top-center-right, upper-mid-left, upper-mid-center-left, upper-mid-center-right."
+      ]
+    },
+    {
+      "image_a": "images (11).jpg",
+      "image_b": "s9g8qx7q77.jpeg",
+      "overall_similarity_score": 0.3581,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2778,
+      "color_score": 0.4571,
+      "delta_e_ab": 16.94,
+      "layout_score": 0.4562,
+      "structural_ssim": 0.5607,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.28).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 16.9 > 10.0, hist corr = 0.64).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-left, upper-mid-center-left, lower-mid-left, lower-mid-center-left."
+      ]
+    },
+    {
+      "image_a": "images (11).jpg",
+      "image_b": "WA_1795563144706@868306938.jpeg",
+      "overall_similarity_score": 0.2215,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.3125,
+      "color_score": 0.253,
+      "delta_e_ab": 21.71,
+      "layout_score": 0.3714,
+      "structural_ssim": 0.4883,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.31).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 21.7 > 10.0, hist corr = 0.45).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-left, upper-mid-center-left, lower-mid-left, lower-mid-center-left."
+      ]
+    },
+    {
+      "image_a": "images (11).jpg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "overall_similarity_score": 0.2539,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2381,
+      "color_score": 0.4728,
+      "delta_e_ab": 18.53,
+      "layout_score": 0.2861,
+      "structural_ssim": 0.3174,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.24).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 18.5 > 10.0, hist corr = 0.82).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, upper-mid-left, upper-mid-center-left."
+      ]
+    },
+    {
+      "image_a": "images (11).jpg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "overall_similarity_score": 0.3099,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.3333,
+      "color_score": 0.6627,
+      "delta_e_ab": 11.78,
+      "layout_score": 0.2698,
+      "structural_ssim": 0.2863,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.33).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 11.8 > 10.0, hist corr = 0.80).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, top-right."
+      ]
+    },
+    {
+      "image_a": "images (12).jpg",
+      "image_b": "images (9).jpg",
+      "overall_similarity_score": 0.2143,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2973,
+      "color_score": 0.1198,
+      "delta_e_ab": 35.78,
+      "layout_score": 0.3553,
+      "structural_ssim": 0.3934,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 11, ratio: 0.30).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 35.8 > 10.0, hist corr = 0.34).",
+        "Structural layout deviations detected in pack zone(s): top-center-left, top-center-right, upper-mid-center-left, upper-mid-center-right."
+      ]
+    },
+    {
+      "image_a": "images (12).jpg",
+      "image_b": "s9g8qx7q77.jpeg",
+      "overall_similarity_score": 0.2664,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.0563,
+      "color_score": 0.1965,
+      "delta_e_ab": 22.85,
+      "layout_score": 0.4426,
+      "structural_ssim": 0.5494,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 4, ratio: 0.06).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 22.9 > 10.0, hist corr = 0.38).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-center-left, upper-mid-center-right, lower-mid-center-left, lower-mid-center-right."
+      ]
+    },
+    {
+      "image_a": "images (12).jpg",
+      "image_b": "WA_1795563144706@868306938.jpeg",
+      "overall_similarity_score": 0.2135,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.1714,
+      "color_score": 0.2487,
+      "delta_e_ab": 23.76,
+      "layout_score": 0.3723,
+      "structural_ssim": 0.489,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 6, ratio: 0.17).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 23.8 > 10.0, hist corr = 0.61).",
+        "Structural layout deviations detected in pack zone(s): top-center-right, upper-mid-center-left, upper-mid-center-right, lower-mid-center-left."
+      ]
+    },
+    {
+      "image_a": "images (12).jpg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "overall_similarity_score": 0.1378,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.1667,
+      "color_score": 0.1451,
+      "delta_e_ab": 22.28,
+      "layout_score": 0.2456,
+      "structural_ssim": 0.2817,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 9, ratio: 0.17).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 22.3 > 10.0, hist corr = 0.19).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, top-right."
+      ]
+    },
+    {
+      "image_a": "images (12).jpg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "overall_similarity_score": 0.2,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.125,
+      "color_score": 0.3641,
+      "delta_e_ab": 15.42,
+      "layout_score": 0.2416,
+      "structural_ssim": 0.2689,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 10, ratio: 0.12).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 15.4 > 10.0, hist corr = 0.25).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, top-right."
+      ]
+    },
+    {
+      "image_a": "images (9).jpg",
+      "image_b": "s9g8qx7q77.jpeg",
+      "overall_similarity_score": 0.3156,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2857,
+      "color_score": 0.3212,
+      "delta_e_ab": 27.93,
+      "layout_score": 0.4628,
+      "structural_ssim": 0.5949,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 6, ratio: 0.29).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 27.9 > 10.0, hist corr = 0.92).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-center-left, upper-mid-center-right, lower-mid-center-left, lower-mid-center-right."
+      ]
+    },
+    {
+      "image_a": "images (9).jpg",
+      "image_b": "WA_1795563144706@868306938.jpeg",
+      "overall_similarity_score": 0.181,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2632,
+      "color_score": 0.084,
+      "delta_e_ab": 28.18,
+      "layout_score": 0.4075,
+      "structural_ssim": 0.5241,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.26).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 28.2 > 10.0, hist corr = 0.24).",
+        "Structural layout deviations detected in pack zone(s): top-center-right, upper-mid-center-right, lower-mid-center-left, lower-mid-center-right."
+      ]
+    },
+    {
+      "image_a": "images (9).jpg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "overall_similarity_score": 0.1641,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.28,
+      "color_score": 0.1733,
+      "delta_e_ab": 28.21,
+      "layout_score": 0.2805,
+      "structural_ssim": 0.3081,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 7, ratio: 0.28).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 28.2 > 10.0, hist corr = 0.50).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, top-right."
+      ]
+    },
+    {
+      "image_a": "images (9).jpg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "overall_similarity_score": 0.1871,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.3125,
+      "color_score": 0.2792,
+      "delta_e_ab": 22.75,
+      "layout_score": 0.2506,
+      "structural_ssim": 0.2711,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.31).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 22.7 > 10.0, hist corr = 0.61).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, top-right."
+      ]
+    },
+    {
+      "image_a": "s9g8qx7q77.jpeg",
+      "image_b": "WA_1795563144706@868306938.jpeg",
+      "overall_similarity_score": 0.2143,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.1579,
+      "color_score": 0.1714,
+      "delta_e_ab": 21.55,
+      "layout_score": 0.3921,
+      "structural_ssim": 0.5048,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 3, ratio: 0.16).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 21.5 > 10.0, hist corr = 0.20).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-center-left, upper-mid-center-right, lower-mid-center-left, lower-mid-center-right."
+      ]
+    },
+    {
+      "image_a": "s9g8qx7q77.jpeg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "overall_similarity_score": 0.1857,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2333,
+      "color_score": 0.2466,
+      "delta_e_ab": 21.48,
+      "layout_score": 0.286,
+      "structural_ssim": 0.3254,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 7, ratio: 0.23).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 21.5 > 10.0, hist corr = 0.41).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-left, upper-mid-center-left, upper-mid-center-right, upper-mid-right."
+      ]
+    },
+    {
+      "image_a": "s9g8qx7q77.jpeg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "overall_similarity_score": 0.2541,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2273,
+      "color_score": 0.5058,
+      "delta_e_ab": 14.8,
+      "layout_score": 0.26,
+      "structural_ssim": 0.2934,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.23).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 14.8 > 10.0, hist corr = 0.60).",
+        "Structural layout deviations detected in pack zone(s): top-center-left, top-center-right, top-right, upper-mid-left."
+      ]
+    },
+    {
+      "image_a": "WA_1795563144706@868306938.jpeg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "overall_similarity_score": 0.2474,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.3571,
+      "color_score": 0.2369,
+      "delta_e_ab": 26.8,
+      "layout_score": 0.2582,
+      "structural_ssim": 0.3033,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 5, ratio: 0.36).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 26.8 > 10.0, hist corr = 0.68).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, top-right."
+      ]
+    },
+    {
+      "image_a": "WA_1795563144706@868306938.jpeg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "overall_similarity_score": 0.2675,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2692,
+      "color_score": 0.3271,
+      "delta_e_ab": 21.58,
+      "layout_score": 0.26,
+      "structural_ssim": 0.2963,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 7, ratio: 0.27).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 21.6 > 10.0, hist corr = 0.65).",
+        "Structural layout deviations detected in pack zone(s): top-left, top-center-left, top-center-right, top-right."
+      ]
+    },
+    {
+      "image_a": "WhatsApp Image 2026-11-24 at 21.18.18.jpeg",
+      "image_b": "WhatsApp Image 2026-11-24 at 21.18.19.jpeg",
+      "overall_similarity_score": 0.427,
+      "is_counterfeit_suspect": true,
+      "alignment_matched": false,
+      "inlier_ratio": 0.2121,
+      "color_score": 0.6418,
+      "delta_e_ab": 14.34,
+      "layout_score": 0.3563,
+      "structural_ssim": 0.4016,
+      "inconsistencies": [
+        "Geometric layout failed alignment with reference pack (inliers: 7, ratio: 0.21).",
+        "Packaging color mismatch detected (CIELAB \u0394E_ab = 14.3 > 10.0, hist corr = 0.95).",
+        "Structural layout deviations detected in pack zone(s): upper-mid-center-left, upper-mid-center-right, lower-mid-left, lower-mid-center-left."
+      ]
+    }
+  ]
+}

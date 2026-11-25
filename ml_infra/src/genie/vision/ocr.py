@@ -40,10 +40,10 @@ class PackagingOCR:
     # Comprehensive Nigerian NAFDAC Registration Number Patterns
     NAFDAC_PATTERNS = [
         re.compile(
-            r"(?:NAFDAC(?:\s*REG(?:ISTRATION)?(?:\.|\s*NO)?)?|NRN|N\.R\.N\.?)[:\s.-]*(\b[A-B0-9]{2}\s*[-–—]\s*[0-9]{4,6}[A-Z]?\b)",
+            r"(?:NAFDAC(?:\s*REG(?:ISTRATION)?(?:\.|\s*NO)?)?|NRN|N\.R\.N\.?)[:\s.-]*(\b[A-Z0-9]{2}\s*[-–—]?\s*[0-9]{4,6}[A-Z]?\b)",
             re.IGNORECASE,
         ),
-        re.compile(r"\b([A-B]\d\s*[-–—]\s*\d{4,6}[A-Z]?)\b", re.IGNORECASE),
+        re.compile(r"\b([A-Z]\d\s*[-–—]\s*\d{4,6}[A-Z]?)\b", re.IGNORECASE),
         re.compile(r"\b(\d{2}\s*[-–—]\s*\d{4,6}[A-Z]?)\b"),
     ]
 
@@ -243,6 +243,7 @@ class PackagingOCR:
 
     def _run_ocr_engine(self, image_np: np.ndarray) -> List[str]:
         lines: List[str] = []
+        # 1. PaddleOCR
         try:
             from paddleocr import PaddleOCR
             ocr = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
@@ -250,8 +251,46 @@ class PackagingOCR:
             if results and results[0]:
                 for line in results[0]:
                     lines.append(line[1][0])
+            if lines:
+                return lines
         except Exception:
             pass
+
+        # 2. RapidOCR ONNX Runtime fallback (cached singleton)
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+            if not hasattr(self, "_rapid_ocr") or self._rapid_ocr is None:
+                self._rapid_ocr = RapidOCR()
+            res, _ = self._rapid_ocr(image_np)
+            if res:
+                for item in res:
+                    if len(item) >= 2 and item[1]:
+                        lines.append(str(item[1]))
+            if lines:
+                return lines
+        except Exception:
+            pass
+
+        # 3. EasyOCR fallback
+        try:
+            import easyocr
+            reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+            res = reader.readtext(image_np, detail=0)
+            if res:
+                return [str(t) for t in res if str(t).strip()]
+        except Exception:
+            pass
+
+        # 4. Tesseract fallback
+        try:
+            import pytesseract
+            txt = pytesseract.image_to_string(image_np)
+            extracted = [ln.strip() for ln in txt.splitlines() if ln.strip()]
+            if extracted:
+                return extracted
+        except Exception:
+            pass
+
         return lines
 
     def _normalize_ocr_text(self, text: str) -> str:

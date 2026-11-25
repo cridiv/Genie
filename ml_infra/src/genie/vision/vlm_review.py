@@ -98,7 +98,10 @@ class VLMReviewer:
             prompt_text += (
                 "Inspect this query packaging scan. Read all visible printed text, "
                 "especially the NAFDAC registration number, Batch/Lot number, and Expiry date. "
-                "Identify brand name, manufacturer, and evaluate print sharpness and layout consistency.\n\n"
+                "Identify brand name, manufacturer, and evaluate print sharpness, tampering signs "
+                "(e.g. torn labels, hand-drawn pen markings, missing regulatory seals), and layout consistency. "
+                "Note: If two boxes are shown side-by-side representing an outer multipack carton (e.g. '10 x 1 x 6') "
+                "and its inner unit pack (e.g. '1 x 6'), that outer-vs-inner pack count difference is normal and NOT a defect.\n\n"
             )
             content_items.append({"type": "text", "text": prompt_text})
             content_items.append({
@@ -136,8 +139,16 @@ class VLMReviewer:
             "top_p": 0.95,
         }
 
-    def _parse_response(self, raw_text: str) -> VLMReviewResult:
+    def _parse_response(self, raw_text: Optional[str]) -> VLMReviewResult:
         """Parses model JSON output, stripping any markdown wrappers."""
+        if not raw_text:
+            return VLMReviewResult(
+                score=0.5,
+                confidence=0.2,
+                is_consistent=True,
+                triage_verdict="Cannot verify",
+                reasons=["VLM returned empty response content."],
+            )
         clean_text = raw_text.strip()
         # Remove markdown code fences if present
         clean_text = re.sub(r"^```(?:json)?\s*", "", clean_text)
@@ -205,7 +216,8 @@ class VLMReviewer:
                 resp.raise_for_status()
                 res_json = resp.json()
 
-            raw_content = res_json["choices"][0]["message"]["content"]
+            msg = res_json["choices"][0]["message"]
+            raw_content = msg.get("content") or msg.get("reasoning_content") or ""
             return self._parse_response(raw_content)
 
         except Exception as e:

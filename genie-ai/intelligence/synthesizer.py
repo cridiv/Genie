@@ -20,8 +20,10 @@ from .llm import LLMProvider, get_default_provider
 from .schemas import (
     BatchImageVerificationResponse,
     CandidateProductDossier,
+    CounterfeitTell,
     ExtractedDossierResponse,
     PackagingVersion,
+    SecurityFeatureSpec,
     VerifiedReferenceImage,
 )
 from .storage import ImageStorage, LocalImageStorage
@@ -30,14 +32,20 @@ DOSSIER_SYSTEM_INSTRUCTION = """You are GENIE AI's pharmaceutical intelligence e
 Your job is to synthesize a structured Product Dossier ONLY from the provided NAFDAC Greenbook records and scraped web/SmPC sources.
 
 Strict grounding rules:
-1. Never invent, extrapolate, or guess drug details, NAFDAC registration numbers, strengths, pack sizes, or manufacturers. If a field is not supported by the sources, leave it null or [].
-2. For EVERY populated field (such as brand_name, generic_name, active_ingredients, strength, dosage_form, pack_size, manufacturer, nafdac_number, registration_status, packaging_description, recall_alerts, version_notes), emit at least one entry in `claims`.
+1. Never invent, extrapolate, or guess drug details, NAFDAC registration numbers, GTINs, shelf life, strengths, pack sizes, or manufacturers. If a field is not supported by the sources, leave it null or [].
+2. For EVERY populated field (such as brand_name, generic_name, active_ingredients, strength, dosage_form, pack_size, manufacturer, nafdac_number, registration_status, shelf_life_months, storage_statement, packaging_description, recall_alerts, version_notes), emit at least one entry in `claims`.
 3. Every `EvidenceClaim` MUST specify:
    - `field_name`: the schema field name it supports
-   - `value`: the concise extracted value
+   - `value`: the concise extracted value as a string
    - `source_url`: the exact `source_url` from the prompt where this evidence came from
    - `verbatim_quote`: an EXACT, contiguous substring copied character-for-character from that source's text (do not paraphrase or alter numbers).
-4. Prefer Tier 1 regulatory/Greenbook and official manufacturer sources over Tier 2/3 when summarizing canonical identity, and surface any recall alerts or packaging change notices in `recall_alerts` and `version_notes`."""
+4. Extract SmPC technical specs whenever present in `smpc_extracted_sections` or source content:
+   - `shelf_life_months`: integer months (e.g. "2 years" -> 24, "36 months" -> 36).
+   - `storage_statement`: exact storage condition (e.g. "Do not store above 30°C. Store in the original package.").
+5. Extract non-NAFDAC intelligence when supported by sources:
+   - `expected_security_features`: physical/anti-counterfeit cues (tablet debossing like 'NC'/'CG', scratch PIN, hologram, tamper seal, QR code, braille). Set `verifiable=true` ONLY for features checkable against an external authority (e.g. scratch PIN or QR resolving to manufacturer domain).
+   - `known_counterfeit_tells`: actively mine `regulatory_alerts` and `packaging_alerts` sources for what seized/falsified packs of this drug got wrong — compromised batch numbers (`affected_batches`), fake MFG/EXP dates, spelling errors, wrong foil/box colors, or missing security features. Tag `source_kind="nafdac_derived"` if the source is on `nafdac.gov.ng`, otherwise `"independent"`.
+6. Prefer Tier 1 regulatory/Greenbook and official manufacturer sources over Tier 2/3 when summarizing canonical identity, and surface any recall alerts or packaging change notices in `recall_alerts` and `version_notes`."""
 
 IMAGE_VERIFY_SYSTEM_INSTRUCTION = """You are GENIE AI's pharmaceutical visual verification specialist.
 Evaluate each candidate image strictly against the target pharmaceutical product AND compare candidate images against each other to separate distinct packaging editions.
@@ -80,6 +88,119 @@ def _format_greenbook_source(match: Dict) -> str:
     return "\n".join(line for line in lines if not line.endswith(": "))
 
 
+_SMPC_SECTION_PATTERNS = (
+    ("3. Pharmaceutical form", re.compile(r"(?im)(?:^|\n)\s*3\.?\s+pharmaceutical\s+form\b")),
+    ("6.3 Shelf life", re.compile(r"(?im)(?:^|\n)\s*6\.3\.?\s+shelf[\s\-]*life\b|\bshelf[\s\-]*life\s*:")),
+    (
+        "6.4 Special precautions for storage",
+        re.compile(
+            r"(?im)(?:^|\n)\s*6\.4\.?\s+special\s+precautions\s+for\s+storage\b|\bstorage\s+conditions?\s*:"
+        ),
+    ),
+    (
+        "6.5 Nature and contents of container",
+        re.compile(r"(?im)(?:^|\n)\s*6\.5\.?\s+nature\s+and\s+contents\s+of\s+container\b"),
+    ),
+)
+_NEXT_SMPC_HEADING_RE = re.compile(r"(?m)\n\s*(?:\d+\.\d+|\d+\.)\s+[A-Z]")
+_SHELF_LIFE_YEARS_RE = re.compile(r"\b(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b", re.IGNORECASE)
+_SHELF_LIFE_MONTHS_RE = re.compile(r"\b(\d+)\s*(?:months?|mos?)\b", re.IGNORECASE)
+
+
+def extract_smpc_key_sections(text: str, *, max_section_chars: int = 700) -> str:
+    """Deterministically pull SmPC §3 / §6.3 / §6.4 / §6.5 blocks before body truncation."""
+    if not text or not text.strip():
+        return ""
+    blocks: List[str] = []
+    seen_spans: set[tuple[int, int]] = set()
+    for label, pattern in _SMPC_SECTION_PATTERNS:
+        m = pattern.search(text)
+        if not m:
+            continue
+        start = m.start()
+        tail = text[m.end() : m.end() + max_section_chars]
+        next_m = _NEXT_SMPC_HEADING_RE.search(tail)
+        end = m.end() + (next_m.start() if next_m else len(tail))
+        span = (start, end)
+        if span in seen_spans:
+            continue
+        seen_spans.add(span)
+        snippet = text[start:end].strip()
+        if snippet:
+            blocks.append(f"[{label}]\n{snippet}")
+    return "\n\n".join(blocks)
+
+
+def parse_shelf_life_months(text: str) -> Optional[int]:
+    """Parse an integer shelf life in months from SmPC §6.3 text (e.g. '3 years' -> 36, '24 months' -> 24)."""
+    if not text:
+        return None
+    m_mo = _SHELF_LIFE_MONTHS_RE.search(text)
+    if m_mo:
+        val = int(m_mo.group(1))
+        if 1 <= val <= 120:
+            return val
+    m_yr = _SHELF_LIFE_YEARS_RE.search(text)
+    if m_yr:
+        val = int(round(float(m_yr.group(1)) * 12))
+        if 1 <= val <= 120:
+            return val
+    return None
+
+
+def collect_validated_gtins(bundle: DiscoveryBundle) -> List[str]:
+    """Deterministically gather GS1-validated GTINs from enriched seed and scraped sources."""
+    gtins: List[str] = []
+
+    def _add(raw: object) -> None:
+        val = re.sub(r"\D", "", str(raw or ""))
+        if len(val) in (8, 12, 13, 14) and val not in gtins:
+            gtins.append(val)
+
+    if bundle.enriched_seed.gtin:
+        _add(bundle.enriched_seed.gtin)
+    for src in bundle.sources:
+        for g in (src.identifiers or {}).get("gtins") or []:
+            _add(g)
+        if isinstance(src.product, dict) and src.product.get("gtin"):
+            _add(src.product.get("gtin"))
+    return gtins
+
+
+def compute_reference_level(packaging_versions: List[PackagingVersion] | List[Dict]) -> str:
+    """Compute reference level A/B/C strictly from `approved` packaging images (staging never counts).
+
+    - A: >= 2 distinct approved views (e.g. front_box + back_box/blister_pack)
+    - B: exactly 1 distinct approved view (usually front_box)
+    - C: no approved packaging references (degraded mode)
+    """
+    approved_views: set[str] = set()
+    for ver in packaging_versions or []:
+        imgs = ver.get("images", []) if isinstance(ver, dict) else (ver.images or [])
+        for img in imgs:
+            status = img.get("status") if isinstance(img, dict) else img.status
+            view = img.get("view_type") if isinstance(img, dict) else img.view_type
+            if status == "approved" and view and view != "other":
+                approved_views.add(str(view).strip().lower())
+    if len(approved_views) >= 2:
+        return "A"
+    if len(approved_views) == 1:
+        return "B"
+    return "C"
+
+
+def _normalize_counterfeit_tells(tells: List[CounterfeitTell]) -> List[CounterfeitTell]:
+    """Enforce honest source_kind tagging: any NAFDAC-hosted alert is `nafdac_derived`."""
+    out: List[CounterfeitTell] = []
+    for tell in tells:
+        host = (urlparse(tell.source_url or "").hostname or "").lower()
+        if host == "nafdac.gov.ng" or host.endswith(".nafdac.gov.ng"):
+            out.append(tell.model_copy(update={"source_kind": "nafdac_derived"}))
+        else:
+            out.append(tell)
+    return out
+
+
 def build_dossier_prompt(
     bundle: DiscoveryBundle,
     *,
@@ -111,6 +232,10 @@ def build_dossier_prompt(
                 parts.append(f"json_ld_product: {json.dumps(src.product, ensure_ascii=False)}")
             if src.identifiers and (src.identifiers.get("nafdac_numbers") or src.identifiers.get("gtins")):
                 parts.append(f"extracted_identifiers: {json.dumps(src.identifiers, ensure_ascii=False)}")
+            if src.is_smpc_pdf and src.content:
+                smpc_blocks = extract_smpc_key_sections(src.content)
+                if smpc_blocks:
+                    parts.append(f"smpc_extracted_sections:\n{smpc_blocks}")
             text = (src.content or "")[:max_chars_per_source].strip()
             parts.append(f"content:\n{text}")
             sections.append("\n".join(parts))
@@ -337,12 +462,31 @@ def verify_images(
     *,
     product_key: Optional[str] = None,
     max_unique: int = 6,
+    trusted_store=None,
+    trusted_only_images: bool = True,
     downloader: Optional[Callable[[str], Tuple[bytes, str]]] = None,
     progress_cb: Optional[Callable[[str], None]] = None,
+    funnel_out: Optional[Dict[str, int]] = None,
 ) -> Tuple[List[VerifiedReferenceImage], List[Dict], Dict[str, str]]:
     """Download, deduplicate, visually verify via multimodal LLM, and persist valid packaging images."""
-    candidates = collect_candidate_image_urls(bundle)
+    funnel: Dict[str, int] = {}
+    candidates = collect_candidate_image_urls(
+        bundle,
+        trusted_store=trusted_store,
+        trusted_only=trusted_only_images,
+        funnel_out=funnel,
+    )
     if not candidates:
+        funnel.update({"downloaded": 0, "passed_vision": 0, "saved": 0})
+        if funnel_out is not None:
+            funnel_out.update(funnel)
+        if progress_cb:
+            progress_cb(
+                f"[3b] Image funnel: raw={funnel.get('raw_total', 0)} "
+                f"(pages={funnel.get('raw_from_pages', 0)}, search={funnel.get('raw_from_search', 0)}) "
+                f"-> dropped_alert={funnel.get('dropped_disqualified', 0)}, "
+                f"dropped_untrusted={funnel.get('dropped_untrusted', 0)} -> trusted=0 -> saved=0"
+            )
         return [], [], {}
 
     if progress_cb:
@@ -359,6 +503,15 @@ def verify_images(
             f"({len(kept)} unique kept, {len(rejected)} pre-filtered)"
         )
     if not kept:
+        funnel.update({"downloaded": 0, "passed_vision": 0, "saved": 0})
+        if funnel_out is not None:
+            funnel_out.update(funnel)
+        if progress_cb:
+            progress_cb(
+                f"[3b] Image funnel: raw={funnel.get('raw_total', 0)} "
+                f"(pages={funnel.get('raw_from_pages', 0)}, search={funnel.get('raw_from_search', 0)}) "
+                f"-> trusted={funnel.get('after_trusted', 0)} -> downloaded=0 -> saved=0"
+            )
         return [], rejected, {}
 
     prompt = build_image_verify_prompt(bundle, kept)
@@ -468,8 +621,29 @@ def verify_images(
                 has_local_regulatory_markers=check.has_local_regulatory_markers,
                 visible_cues=list(check.visible_cues),
                 visible_text_snippets=list(check.visible_text_snippets),
+                captured_from_domain=img.captured_from_domain,
+                captured_from_type=img.captured_from_type,
+                captured_at=img.captured_at,
+                market_verified=bool(check.has_local_regulatory_markers),
                 status="staging",
             )
+        )
+
+    funnel.update(
+        {
+            "downloaded": len(kept),
+            "passed_vision": len(surviving),
+            "saved": len(verified),
+        }
+    )
+    if funnel_out is not None:
+        funnel_out.update(funnel)
+    if progress_cb:
+        progress_cb(
+            f"[3c] Image funnel: raw={funnel.get('raw_total', 0)} "
+            f"(pages={funnel.get('raw_from_pages', 0)}, search={funnel.get('raw_from_search', 0)}) "
+            f"-> trusted={funnel.get('after_trusted', 0)} -> downloaded={len(kept)} "
+            f"-> passed_vision={len(surviving)} -> saved={len(verified)}"
         )
 
     return verified, rejected, edition_summaries
@@ -530,6 +704,8 @@ def synthesize_dossier(
     product_key: Optional[str] = None,
     verify_visuals: bool = True,
     max_unique_images: int = 6,
+    trusted_store=None,
+    trusted_only_images: bool = True,
     image_downloader: Optional[Callable[[str], Tuple[bytes, str]]] = None,
     progress_cb: Optional[Callable[[str], None]] = None,
 ) -> CandidateProductDossier:
@@ -556,6 +732,7 @@ def synthesize_dossier(
     verified_images: List[VerifiedReferenceImage] = []
     rejected_images: List[Dict] = []
     packaging_versions: List[PackagingVersion] = []
+    image_funnel: Dict[str, int] = {}
     if verify_visuals:
         verified_images, rejected_images, edition_summaries = verify_images(
             bundle,
@@ -563,13 +740,34 @@ def synthesize_dossier(
             active_storage,
             product_key=product_key,
             max_unique=max_unique_images,
+            trusted_store=trusted_store,
+            trusted_only_images=trusted_only_images,
             downloader=image_downloader,
             progress_cb=progress_cb,
+            funnel_out=image_funnel,
         )
         packaging_versions = group_packaging_versions(verified_images, edition_summaries)
 
+    merged_gtins = collect_validated_gtins(bundle)
+    for g in extracted.gtins:
+        clean_g = re.sub(r"\D", "", str(g or ""))
+        if len(clean_g) in (8, 12, 13, 14) and clean_g not in merged_gtins:
+            merged_gtins.append(clean_g)
+
+    shelf_life = extracted.shelf_life_months
+    if shelf_life is None:
+        for src in bundle.sources:
+            if src.is_smpc_pdf and src.content:
+                sec = extract_smpc_key_sections(src.content)
+                shelf_life = parse_shelf_life_months(sec)
+                if shelf_life is not None:
+                    break
+
+    normalized_tells = _normalize_counterfeit_tells(list(extracted.known_counterfeit_tells))
+    ref_level = compute_reference_level(packaging_versions)
+
     elapsed = round(time.monotonic() - t0, 3)
-    return CandidateProductDossier(
+    dossier = CandidateProductDossier(
         seed=bundle.seed.to_dict(),
         enriched_seed=bundle.enriched_seed.to_dict(),
         brand_name=extracted.brand_name,
@@ -581,12 +779,18 @@ def synthesize_dossier(
         manufacturer=extracted.manufacturer,
         nafdac_number=extracted.nafdac_number,
         registration_status=extracted.registration_status,
+        gtins=merged_gtins,
+        shelf_life_months=shelf_life,
+        storage_statement=extracted.storage_statement,
         packaging_description=extracted.packaging_description,
         color_scheme=list(extracted.color_scheme),
         distinctive_features=list(extracted.distinctive_features),
+        expected_security_features=list(extracted.expected_security_features),
+        known_counterfeit_tells=normalized_tells,
         recall_alerts=list(extracted.recall_alerts),
         version_notes=list(extracted.version_notes),
         claims=list(extracted.claims),
+        reference_level=ref_level,
         packaging_versions=packaging_versions,
         reference_images=verified_images,
         rejected_images=rejected_images,
@@ -594,10 +798,22 @@ def synthesize_dossier(
         stats={
             "elapsed_s": elapsed,
             "claims_count": len(extracted.claims),
+            "gtins_count": len(merged_gtins),
+            "counterfeit_tells_count": len(normalized_tells),
+            "security_features_count": len(extracted.expected_security_features),
+            "reference_level": ref_level,
             "packaging_versions_count": len(packaging_versions),
             "reference_images_count": len(verified_images),
             "rejected_images_count": len(rejected_images),
+            "image_funnel": image_funnel,
             "sources_used": len(bundle.sources),
             "greenbook_matches_used": len(bundle.greenbook_matches),
         },
     )
+
+    from validation.evidence import validate_dossier_evidence  # noqa: PLC0415
+
+    validated_dossier, gate_report = validate_dossier_evidence(bundle, dossier, sanitize=True)
+    validated_dossier.stats["evidence_gate"] = gate_report.model_dump()
+    validated_dossier.stats["dossier_status"] = gate_report.dossier_status
+    return validated_dossier

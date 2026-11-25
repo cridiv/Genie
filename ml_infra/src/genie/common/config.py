@@ -16,10 +16,7 @@ class Settings(BaseSettings):
     APP_PORT: int = 8000
     LOG_LEVEL: str = "INFO"
 
-    # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./data/genie.db"
-
-    # Vector Storage
+    # Vector Storage (Qdrant)
     QDRANT_HOST: str = "localhost"
     QDRANT_PORT: int = 6333
     QDRANT_COLLECTION: str = "reference_packaging_faces"
@@ -34,9 +31,18 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     GOOGLE_MAPS_API_KEY: Optional[str] = None
 
+    # NVIDIA NIM Cloud (VLM Discrepancy Review, OCR, Vision)
+    NVIDIA_API_KEY: Optional[str] = None
+    NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    NVIDIA_VLM_MODEL: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+
     # Reference paths
     CONFIGS_DIR: Path = Path("./configs")
     GREENBOOK_DB_PATH: Path = Path("./data/greenbook/greenbook.db")
+
+    # GENIE AI Product Intelligence & Verification Service Bridge
+    GENIE_AI_URL: Optional[str] = None
+    GENIE_AI_TIMEOUT_SECONDS: float = 5.0
 
     @property
     def is_production(self) -> bool:

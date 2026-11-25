@@ -1,5 +1,5 @@
 """Scan input schemas."""
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -7,7 +7,24 @@ from pydantic import BaseModel, Field
 class ScanImage(BaseModel):
     image_bytes_base64: Optional[str] = None
     image_url: Optional[str] = None
-    face_hint: Optional[str] = Field(None, example="front")  # front, back, blister, side
+    face_hint: Optional[str] = Field(None, json_schema_extra={"example": "front"})
+
+
+class ReferenceCandidateInput(BaseModel):
+    """Canonical product metadata and reference pack image supplied by the Backend DB."""
+    product_id: Optional[str] = None
+    brand_name: Optional[str] = None
+    manufacturer: Optional[str] = None
+    primary_nafdac_number: Optional[str] = None
+    gtin_list: List[str] = Field(default_factory=list)
+    version_label: Optional[str] = None
+    is_legacy_version: bool = False
+    in_transition_window: bool = True
+    batch_number_regex: Optional[str] = None
+    nafdac_status: str = "active"
+    reference_image_base64: Optional[str] = None
+    reference_image_path: Optional[str] = None
+    semantic_regions: Optional[Dict[str, Any]] = None
 
 
 class DecodedBarcode(BaseModel):
@@ -35,3 +52,4 @@ class ScanRequest(BaseModel):
     user_latitude: Optional[float] = None
     user_longitude: Optional[float] = None
     user_session_id: Optional[str] = None
+    reference_candidate: Optional[ReferenceCandidateInput] = None

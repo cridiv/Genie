@@ -70,5 +70,8 @@ def site_scoped(query: str, include_domains: Optional[List[str]]) -> str:
     """Append site: operators so the backend prefers the wanted domains."""
     if not include_domains:
         return query
-    return query + " " + " OR ".join(f"site:{d}" for d in include_domains)
+    if len(include_domains) == 1:
+        return f"{query} site:{include_domains[0]}"
+    clause = " OR ".join(f"site:{d}" for d in include_domains)
+    return f"{query} ({clause})"
 # Stand: 24.10.2026

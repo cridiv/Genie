@@ -9,6 +9,7 @@ class NAFDACSignalEvaluator:
         self,
         scanned_nafdac: Optional[str],
         registered_product: Optional[Dict[str, Any]],
+        registry_checked: bool = True,
     ) -> SignalResult:
         if not scanned_nafdac:
             return SignalResult(
@@ -18,6 +19,14 @@ class NAFDACSignalEvaluator:
             )
 
         if not registered_product:
+            if not registry_checked:
+                return SignalResult(
+                    score=0.5,
+                    confidence=0.25,
+                    reasons=[
+                        f"NAFDAC number {scanned_nafdac} extracted, but no Greenbook registry reference was available to verify it."
+                    ],
+                )
             return SignalResult(
                 score=0.2,
                 confidence=0.7,

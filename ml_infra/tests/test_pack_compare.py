@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from genie.schemas.scan import ScanImage, ScanRequest
+from genie.schemas.verdict import VerdictState
 from genie.storage.object_store import LocalImageStorage
 from genie.storage.vector_store import InMemoryVectorStore
 from genie.verification.pipeline import VerificationPipeline
@@ -159,3 +160,59 @@ async def test_reference_indexer_and_pipeline_comparison(tmp_path):
     )
     assert res_fake.signals.visual_similarity_score < res_ok.signals.visual_similarity_score
     assert any("color mismatch" in r.lower() for r in res_fake.signals.reasons)
+
+
+def test_surface_texture_mismatch_flags_counterfeit():
+    ref, regions = _make_synthetic_pack()
+    # Add coarse counterfeit paper grain / micro-texture noise while preserving color & layout
+    rng = np.random.default_rng(7)
+    grain = rng.normal(0, 18.0, ref.shape).astype(np.float32)
+    fake_textured = np.clip(ref.astype(np.float32) + grain, 0, 255).astype(np.uint8)
+
+    comparator = PackComparator()
+    res = comparator.compare(fake_textured, ref, semantic_regions=regions)
+
+    assert res.texture_mismatch is True
+    assert res.texture_score < comparator.min_texture_score
+    assert res.is_counterfeit_suspect is True
+    assert any("surface texture" in msg.lower() for msg in res.inconsistencies)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_flags_fake_on_surface_texture_mismatch(tmp_path):
+    vector_store = InMemoryVectorStore()
+    storage = LocalImageStorage(base_dir=tmp_path / "images")
+    ref_img, regions = _make_synthetic_pack()
+
+    indexer = ReferencePackIndexer(vector_store=vector_store, image_storage=storage)
+    await indexer.index_reference_pack(
+        product_id=str(uuid.uuid4()),
+        product_version_id=str(uuid.uuid4()),
+        image_bgr=ref_img,
+        brand_name="GENIEMED",
+        manufacturer="GENIE PHARMA",
+        nafdac_number="B4-6458",
+        gtin_list=["06150000000012"],
+        version_label="v1.0",
+        face_type="front",
+        semantic_regions=regions,
+    )
+
+    pipeline = VerificationPipeline(vector_store=vector_store)
+
+    rng = np.random.default_rng(7)
+    grain = rng.normal(0, 18.0, ref_img.shape).astype(np.float32)
+    fake_textured = np.clip(ref_img.astype(np.float32) + grain, 0, 255).astype(np.uint8)
+    _, buf = cv2.imencode(".jpg", fake_textured)
+    fake_b64 = base64.b64encode(buf.tobytes()).decode("utf-8")
+
+    res = await pipeline.verify_scan(
+        ScanRequest(
+            images=[ScanImage(image_bytes_base64=fake_b64, face_hint="front")],
+            manual_nafdac="B4-6458",
+        )
+    )
+
+    assert res.verdict == VerdictState.SUSPICIOUS
+    assert res.confidence >= 0.95
+    assert "surface texture" in res.explanation.lower()

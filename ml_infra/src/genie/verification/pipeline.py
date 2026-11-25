@@ -24,7 +24,6 @@ from genie.verification.signals.batch_signal import BatchSignalEvaluator
 from genie.verification.signals.history_signal import HistorySignalEvaluator
 from genie.verification.signals.nafdac_signal import NAFDACSignalEvaluator
 from genie.verification.signals.visual_signal import VisualSignalEvaluator
-from genie.vision.anomaly import PatchCoreAnomalyDetector
 from genie.vision.embed import VisualEmbedder
 from genie.vision.ocr import PackagingOCR
 from genie.vision.pack_compare import PackComparator
@@ -52,7 +51,6 @@ class VerificationPipeline:
         self.barcode_detector = BarcodeDetector()
         self.visual_embedder = VisualEmbedder()
         self.ocr = PackagingOCR(enable_vlm=False)
-        self.anomaly_detector = PatchCoreAnomalyDetector()
         self.pack_comparator = PackComparator()
         self.vlm_reviewer = VLMReviewer()
         self.resolver = ProductResolver(vector_store)
@@ -137,13 +135,15 @@ class VerificationPipeline:
             reference_candidate=request.reference_candidate,
         )
 
-        # 7b. Reference Pack Comparison (Color, Element Positioning, Layout, Anomaly)
+        # 7b. Reference Pack Comparison (Color, Element Positioning, Layout, Texture, Anomaly)
         ref_img, semantic_regions = self._load_reference_image(resolved)
         comp = None
         inlier_ratio = 0.5
         anomaly_score = 0.2
         color_score: Optional[float] = None
         layout_score: Optional[float] = None
+        texture_score: Optional[float] = None
+        texture_mismatch = False
         visual_inconsistencies: list[str] = []
 
         if ref_img is not None:
@@ -164,6 +164,8 @@ class VerificationPipeline:
             anomaly_score = comp.anomaly_score
             color_score = comp.color_score
             layout_score = comp.layout_score
+            texture_score = comp.texture_score
+            texture_mismatch = comp.texture_mismatch
             visual_inconsistencies = comp.inconsistencies
 
         # 7c. Optional GENIE AI Product Intelligence & Multi-Signal Verification Bridge
@@ -261,6 +263,8 @@ class VerificationPipeline:
             layout_score=layout_score,
             inconsistencies=visual_inconsistencies,
             reference_available=(ref_img is not None),
+            texture_score=texture_score,
+            texture_mismatch=texture_mismatch,
         )
         sig_history = self.history_eval.evaluate(
             is_legacy_match=resolved.is_legacy_version if resolved else False,

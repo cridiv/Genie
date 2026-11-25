@@ -14,6 +14,8 @@ class VisualSignalEvaluator:
         layout_score: Optional[float] = None,
         inconsistencies: Optional[List[str]] = None,
         reference_available: bool = True,
+        texture_score: Optional[float] = None,
+        texture_mismatch: bool = False,
     ) -> SignalResult:
         if not reference_available:
             reasons = (
@@ -31,12 +33,37 @@ class VisualSignalEvaluator:
                 },
             )
 
+        if texture_mismatch:
+            t_val = texture_score if texture_score is not None else 0.0
+            inv_msg = f"Package surface texture differs from canonical reference packaging (texture score: {t_val:.2f})."
+            reasons = list(inconsistencies) if inconsistencies else [inv_msg]
+            if inv_msg not in reasons:
+                reasons.insert(0, inv_msg)
+            return SignalResult(
+                score=min(t_val, 0.20),
+                confidence=0.95,
+                hard_invalidation=True,
+                invalidation_reason=inv_msg,
+                reasons=reasons,
+                evidence={
+                    "cosine_similarity": retrieval_cosine_sim,
+                    "inlier_ratio": alignment_inlier_ratio,
+                    "anomaly_score": patch_anomaly_score,
+                    "color_score": color_score,
+                    "layout_score": layout_score,
+                    "texture_score": texture_score,
+                    "texture_mismatch": True,
+                },
+            )
+
         if color_score is not None and layout_score is not None:
+            t_component = texture_score if texture_score is not None else 0.85
             visual_score = (
-                0.20 * retrieval_cosine_sim
-                + 0.20 * alignment_inlier_ratio
+                0.15 * retrieval_cosine_sim
+                + 0.15 * alignment_inlier_ratio
                 + 0.25 * color_score
-                + 0.25 * layout_score
+                + 0.20 * layout_score
+                + 0.15 * t_component
                 + 0.10 * (1.0 - patch_anomaly_score)
             )
             confidence = 0.92
@@ -65,6 +92,8 @@ class VisualSignalEvaluator:
             evidence["color_score"] = color_score
         if layout_score is not None:
             evidence["layout_score"] = layout_score
+        if texture_score is not None:
+            evidence["texture_score"] = texture_score
 
         return SignalResult(
             score=visual_score,

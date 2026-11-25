@@ -1,5 +1,6 @@
 """FastAPI application entrypoint for Genie ML Infrastructure."""
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -10,13 +11,19 @@ from genie.api.v1.products import router as products_router
 from genie.api.v1.verify import router as verify_router
 from genie.common.config import settings
 from genie.common.exceptions import QualityGateError
+from genie.db.models import Base
+from genie.db.session import engine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize connection pools, models, and warm caches
+    # Ensure local SQLite directory exists and create ORM tables idempotently
+    if settings.DATABASE_URL.startswith("sqlite"):
+        Path("./data").mkdir(parents=True, exist_ok=True)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
-    # Cleanup
+    await engine.dispose()
 
 
 app = FastAPI(

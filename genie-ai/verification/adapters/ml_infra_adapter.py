@@ -329,6 +329,8 @@ def to_ml_infra_response(
         "safer_alternatives": alts,
         "execution_time_ms": orch_resp.execution_time_ms,
         "genie_ai": {
+            "scan_id": orch_resp.scan_id,
+            "scan_json_path": orch_resp.scan_json_path,
             "verdict": res.verdict,
             "coverage": res.coverage,
             "reference_level": res.reference_level,

@@ -150,6 +150,21 @@ def create_app(orchestrator: Optional[GenieOrchestrator] = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"Discovery job {job_id!r} not found")
         return job
 
+    @app.get("/v1/scans")
+    def get_scans(
+        limit: int = Query(default=20, ge=1, le=100),
+        verdict: Optional[str] = Query(default=None),
+        nafdac_number: Optional[str] = Query(default=None),
+    ) -> List[Dict[str, Any]]:
+        return orch.list_scans(limit=limit, verdict=verdict, nafdac_number=nafdac_number)
+
+    @app.get("/v1/scans/{scan_id}")
+    def get_scan_detail(scan_id: str) -> Dict[str, Any]:
+        scan = orch.get_scan(scan_id)
+        if scan is None:
+            raise HTTPException(status_code=404, detail=f"Scan run {scan_id!r} not found")
+        return scan
+
     return app
 
 

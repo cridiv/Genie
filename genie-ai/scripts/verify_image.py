@@ -67,6 +67,8 @@ def main() -> int:
     ext = resp.extracted_scan
     ver = resp.verification.result
     print(f"\n=== GENIE AI Live Photo Verification ({img_path.name}) ===")
+    print(f"Scan ID           : {resp.scan_id or '-'}")
+    print(f"Saved JSON        : {resp.scan_json_path or '-'}")
     print(f"Vision Model      : {resp.vision_model}")
     print(f"Extracted Product : {ext.product_name_hint or '-'}")
     print(f"Extracted NAFDAC  : {ext.nafdac_number or '-'}")

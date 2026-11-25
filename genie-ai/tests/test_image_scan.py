@@ -126,6 +126,15 @@ class TestImageScan(unittest.TestCase):
                 self.assertEqual(llm.calls, [("ExtractedImageScan", 1), ("VisualComparisonOutput", 2)])
                 self.assertEqual(resp.verification.result.verdict, "authentic")
                 self.assertEqual(resp.verification.result.ml_infra_verdict, "Consistent with genuine")
+                self.assertIsNotNone(resp.scan_id)
+                self.assertTrue(resp.scan_id.startswith("scan_"))
+                self.assertIsNotNone(resp.scan_json_path)
+                self.assertTrue(Path(resp.scan_json_path).is_file())
+                saved = orch.get_scan(resp.scan_id)
+                self.assertIsNotNone(saved)
+                self.assertEqual(saved["source_endpoint"], "verify_image")
+                self.assertEqual(saved["verdict"], "authentic")
+                self.assertIn("extracted_scan", saved["payload"])
             finally:
                 orch.shutdown(wait=False)
 

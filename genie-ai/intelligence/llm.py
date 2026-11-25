@@ -34,15 +34,15 @@ _CODE_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 
 
 def _extract_json_object(raw_text: str) -> str:
-    """Strip reasoning tags / markdown fences and extract the JSON object payload."""
+    """Strip reasoning tags / markdown fences, repair trailing commas, and extract the JSON object."""
     cleaned = _THINK_BLOCK_RE.sub("", raw_text or "").strip()
     cleaned = _CODE_FENCE_RE.sub("", cleaned).strip()
-    if cleaned.startswith("{") and cleaned.endswith("}"):
-        return cleaned
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start != -1 and end > start:
-        return cleaned[start : end + 1]
+    if not (cleaned.startswith("{") and cleaned.endswith("}")):
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end > start:
+            cleaned = cleaned[start : end + 1]
+    cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
     return cleaned
 
 
@@ -318,8 +318,8 @@ class NvidiaProvider:
                     else:
                         self._model = model_name
                     return parsed
-                except httpx.HTTPError as exc:
-                    attempt_errors.append(f"{model_name}: {type(exc).__name__}: {exc}")
+                except (httpx.HTTPError, ValueError) as exc:
+                    attempt_errors.append(f"{model_name}: {type(exc).__name__}: {str(exc)[:160]}")
                     if idx < len(models_to_try) - 1:
                         next_model = models_to_try[idx + 1]
                         print(

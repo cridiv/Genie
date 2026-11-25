@@ -1,7 +1,11 @@
 import type { NearbyPharmaciesResponse, Pharmacy } from "./types";
 
 export const GENIE_AI_API_BASE = (
-  process.env.NEXT_PUBLIC_GENIE_AI_URL || "http://127.0.0.1:8001"
+  process.env.NEXT_PUBLIC_GENIE_AI_URL || "http://102.209.46.116:8001"
+).replace(/\/+$/, "");
+
+export const ML_INFRA_API_BASE = (
+  process.env.NEXT_PUBLIC_ML_INFRA_URL || "http://102.209.46.116:8000"
 ).replace(/\/+$/, "");
 
 export const ABEOKUTA_DEFAULT_COORDS = {
@@ -92,7 +96,7 @@ export async function fetchNearbyPharmacies(params: {
   if (params.limit) qs.set("limit", String(params.limit));
   if (params.verifiedOnly) qs.set("verified_only", "true");
 
-  const resp = await fetch(`${GENIE_AI_API_BASE}/v1/pharmacies/nearby?${qs.toString()}`, {
+  const resp = await fetch(`/api/pharmacies/nearby?${qs.toString()}`, {
     cache: "no-store",
   });
   if (!resp.ok) {

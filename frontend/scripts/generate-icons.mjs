@@ -11,22 +11,31 @@ import { deflateSync } from "node:zlib";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+  LOGO_ACCENT,
+  LOGO_ACCENT_DIM,
+  LOGO_BACK,
+  LOGO_CARD,
+  LOGO_FRONT,
+  LOGO_GRID,
+  LOGO_INK,
+} from "../lib/brand.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-export const INK = "#0b0e13";
-export const ACCENT = "#c8f65a";
-export const ACCENT_DIM = "#566a2f";
+const INK = LOGO_INK;
+const ACCENT = LOGO_ACCENT;
+const ACCENT_DIM = LOGO_ACCENT_DIM;
 
 /**
  * The mark: two portrait cards fanned apart — the front and the back of a pack,
  * drawn exactly the way the scan flow and the result screen tilt their frames.
- * Everything is expressed on a 32-unit grid and scaled from there.
+ * Geometry lives in `lib/brand.ts` so the icons and `LogoMark` stay in sync.
  */
-export const GRID = 32;
-const CARD = { width: 11, height: 13.5, radius: 3.9, tilt: 20 };
-const BACK = { x: 12.6, y: 10.8 };
-const FRONT = { x: 19.4, y: 19.2 };
+const GRID = LOGO_GRID;
+const CARD = LOGO_CARD;
+const BACK = LOGO_BACK;
+const FRONT = LOGO_FRONT;
 
 /** Rounded plate used for the non-maskable icons (23% radius). */
 const PLATE_RADIUS = 118;

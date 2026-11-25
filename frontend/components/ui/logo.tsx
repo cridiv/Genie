@@ -1,39 +1,39 @@
+import { LOGO_BACK, LOGO_CARD, LOGO_FRONT, LOGO_GRID } from "@/lib/brand";
 import { cn } from "@/lib/cn";
+
+const CARDS = [
+  { center: LOGO_BACK, opacity: 0.42 },
+  { center: LOGO_FRONT, opacity: 1 },
+];
 
 /**
  * The Genium mark: the front and the back of a pack, fanned like the pair of
  * frames the scan flow captures and the result screen shows.
  *
- * Drawn on the same 32-unit grid as the generated icons, in `currentColor`, so
- * it stays crisp from a 16px favicon to a launcher icon.
+ * Geometry comes from `lib/brand.ts` — the same source the app icons are
+ * generated from — so the mark stays identical from a 16px favicon upward.
  */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 32 32"
+      viewBox={`0 0 ${LOGO_GRID} ${LOGO_GRID}`}
       aria-hidden
       focusable="false"
       className={cn("shrink-0", className)}
     >
-      <rect
-        x={7.1}
-        y={4.05}
-        width={11}
-        height={13.5}
-        rx={3.9}
-        fill="currentColor"
-        fillOpacity={0.42}
-        transform="rotate(-20 12.6 10.8)"
-      />
-      <rect
-        x={13.9}
-        y={12.45}
-        width={11}
-        height={13.5}
-        rx={3.9}
-        fill="currentColor"
-        transform="rotate(-20 19.4 19.2)"
-      />
+      {CARDS.map(({ center, opacity }) => (
+        <rect
+          key={`${center.x}-${center.y}`}
+          x={center.x - LOGO_CARD.width / 2}
+          y={center.y - LOGO_CARD.height / 2}
+          width={LOGO_CARD.width}
+          height={LOGO_CARD.height}
+          rx={LOGO_CARD.radius}
+          fill="currentColor"
+          fillOpacity={opacity}
+          transform={`rotate(${-LOGO_CARD.tilt} ${center.x} ${center.y})`}
+        />
+      ))}
     </svg>
   );
 }

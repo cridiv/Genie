@@ -1,0 +1,24 @@
+# GENIE AI — Product Intelligence & Verification Engine
+# Install: pip install -r requirements.txt
+
+# HTTP & Web Scraping
+httpx>=0.27
+httpcore>=1.0
+trafilatura>=1.8
+lxml>=5.0
+resiliparse>=0.14
+curl_cffi>=0.7
+ddgs>=6.0
+
+# PDF & Image Handling
+pypdfium2>=5.0
+Pillow>=10.0
+
+# Schemas & Cloud LLM SDK
+pydantic>=2.6
+google-genai>=1.0
+
+# FastAPI Gateway & Multipart Image Uploads
+fastapi>=0.115
+uvicorn>=0.32
+python-multipart>=0.0.9

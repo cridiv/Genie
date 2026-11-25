@@ -9,7 +9,7 @@ export default function OfflinePage() {
   return (
     <Screen className="items-center justify-center text-center">
       <span className="flex h-16 w-16 items-center justify-center rounded-pill bg-accent text-accent-ink">
-        <LogoMark className="h-9 w-9" />
+        <LogoMark className="h-10 w-10" />
       </span>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">You&apos;re offline</h1>

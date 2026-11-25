@@ -43,6 +43,8 @@ export const metadata: Metadata = {
     title: "Genium",
   },
   formatDetection: { telephone: false },
+  // Next emits `mobile-web-app-capable`; older iOS only honours the prefixed tag.
+  other: { "apple-mobile-web-app-capable": "yes" },
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [

@@ -12,7 +12,7 @@ export function SiteNav() {
           href="/"
           className="pointer-events-auto flex h-11 items-center gap-2 rounded-pill border border-line bg-surface pl-2 pr-4 transition-transform duration-200 ease-out active:scale-95"
         >
-          <LogoMark className="h-7 w-7 text-accent" />
+          <LogoMark className="h-8 w-8 text-accent" />
           <span className="font-display text-sm font-bold leading-none tracking-tight">
             genium
           </span>

@@ -17,22 +17,22 @@ export function LogoMark({ className }: { className?: string }) {
     >
       <rect
         x={7.1}
-        y={5.05}
+        y={4.05}
         width={11}
         height={13.5}
         rx={3.9}
         fill="currentColor"
         fillOpacity={0.42}
-        transform="rotate(-12 12.6 11.8)"
+        transform="rotate(-20 12.6 10.8)"
       />
       <rect
         x={13.9}
-        y={13.45}
+        y={12.45}
         width={11}
         height={13.5}
         rx={3.9}
         fill="currentColor"
-        transform="rotate(-12 19.4 20.2)"
+        transform="rotate(-20 19.4 19.2)"
       />
     </svg>
   );

@@ -24,9 +24,9 @@ export const ACCENT_DIM = "#566a2f";
  * Everything is expressed on a 32-unit grid and scaled from there.
  */
 export const GRID = 32;
-const CARD = { width: 11, height: 13.5, radius: 3.9, tilt: 12 };
-const BACK = { x: 12.6, y: 11.8 };
-const FRONT = { x: 19.4, y: 20.2 };
+const CARD = { width: 11, height: 13.5, radius: 3.9, tilt: 20 };
+const BACK = { x: 12.6, y: 10.8 };
+const FRONT = { x: 19.4, y: 19.2 };
 
 /** Rounded plate used for the non-maskable icons (23% radius). */
 const PLATE_RADIUS = 118;

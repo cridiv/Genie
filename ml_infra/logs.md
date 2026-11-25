@@ -267,6 +267,14 @@ For any future change affecting the database (`src/genie/db/models.py`, Alembic 
     - Added hyphenless NAFDAC normalization (`A44724` $\rightarrow$ `A4-4724`) in [`src/genie/extraction/nafdac_parser.py`](src/genie/extraction/nafdac_parser.py) and [`src/genie/vision/ocr.py`](src/genie/vision/ocr.py).
     - Updated [`src/genie/verification/signals/nafdac_signal.py`](src/genie/verification/signals/nafdac_signal.py) and [`src/genie/verification/pipeline.py`](src/genie/verification/pipeline.py) with `registry_checked` so unindexed scans return `Cannot verify` instead of false `Suspicious` verdicts.
 
+23. **Surface Texture Counterfeit Flagging & Lean SQLite/ORB Stack [2026-11-25]**:
+    - Added **package surface texture comparison** (`_compare_surface_texture` using illumination-invariant 8-neighbor LBP histograms and high-pass surface roughness ratio) in [`src/genie/vision/pack_compare.py`](src/genie/vision/pack_compare.py).
+    - Wired `texture_mismatch` into [`src/genie/verification/signals/visual_signal.py`](src/genie/verification/signals/visual_signal.py) as a deterministic `hard_invalidation=True` rule so any surface texture mismatch immediately flags the scan as `Suspicious` (fake) in [`src/genie/verification/pipeline.py`](src/genie/verification/pipeline.py).
+    - Implemented [`SQLiteVectorStore`](src/genie/storage/vector_store.py) (SQLite BLOBs + NumPy cosine similarity) and wired it in [`src/genie/api/deps.py`](src/genie/api/deps.py), replacing Qdrant.
+    - Removed `PatchCoreAnomalyDetector` from the online `VerificationPipeline` & `PackComparator` hot path (marked as roadmap), and kept OpenCV ORB + RANSAC homography in [`src/genie/vision/match.py`](src/genie/vision/match.py) (zero PyTorch).
+    - Removed `postgres`, `pgvector`, `qdrant`, `asyncpg`, `sqlalchemy`, and `qdrant-client` from [`docker/docker-compose.yml`](docker/docker-compose.yml) and [`requirements.txt`](requirements.txt) in favor of SQLite (`aiosqlite` / `sqlite3`).
+    - Database schema status: Zero PostgreSQL changes (`SQLiteVectorStore` uses local `./data/vectors.db`).
+
 ---
 
 ## 2. Database Changelog
